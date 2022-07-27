@@ -1,4 +1,4 @@
-﻿[% PROCESS _header.tt js="plugins/node_control/node_control.js" %]
+﻿[% PROCESS _header.tt js="plugins/node-control/node_control.js" %]
 [% PROCESS _message.tt %]
 [% USE date %]
 
@@ -56,10 +56,14 @@
       <thead>
         <tr>
           <th class="w-32">Section</th>
-          <th class="w-32">Hostname</th>
+          <th class="">Hostname</th>
+          <th class="w-32">Site</th>
           <th class="w-32">OMD</th>
           <th class="w-32">OS</th>
-          <th class="w-6">
+          <th class="w-24">CPU</th>
+          <th class="w-24">Memory</th>
+          <th class="w-24">Disk</th>
+          <th class="w-8">
             <div class="flexrow flex-nowrap gap-1">
               <a href="#" onclick="return ms_run_all(this, '.js-update-btn', {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts For All Visible Servers'></i></a>
             </div>
@@ -69,13 +73,38 @@
       <tbody>
         [% FOREACH s = data %]
           <tr class="js-tabs tabs-managed" id="row_[% s.peer_key | html %]">
-            <td>[% s.section | html %]</td>
-            <td><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/">[% s.omd_site | html %]@[% s.host_name | html %]</a></td>
+            <td>[% IF s.section != "Default"; s.section | html; END %]</td>
+            <td><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/">[% s.host_name | html %]</a></td>
+            <td>[% s.omd_site | html %]</td>
             [% IF s.last_error %]
-            <td colspan="2" class="textALERT">[% s.last_error | html %]</td>
+            <td colspan="5" class="textALERT whitespace-pre">[% s.last_error | html %]</td>
             [% ELSE %]
             <td>[% s.omd_version | html %]</td>
             <td>[% s.os_name | html %] [% s.os_version | html %]</td>
+            <td class='relative'>
+              [% IF s.cpu_perc; %][%IF s.cpu_perc > 1; s.cpu_perc = 1; END %]
+              <div style='width: [% 100 * s.cpu_perc %]%; height: 100%;' class='[% IF s.cpu_perc > 0.9 %]CRITICAL[% ELSIF s.cpu_perc > 0.8 %]WARNING[% ELSE %]OK[% END %] absolute top-0 left-0'></div>
+              [% END %]
+              <span class='absolute top-0 left-0' style='margin-left: 3px;' title="[% IF s.cpu_perc; sprintf("%.d", s.cpu_perc*100); "% used"; END %]">
+                [% IF s.cpu_cores; s.cpu_cores; " Cores"; END %]
+              </span>
+            </td>
+            <td class='relative'>
+              [% IF s.memfree; perc = ( s.memtotal - s.memfree ) / s.memtotal %][%IF perc > 1; perc = 1; END %]
+              <div style='width: [% 100 * perc %]%; height: 100%;' class='[% IF perc > 0.9 %]CRITICAL[% ELSIF perc > 0.8 %]WARNING[% ELSE %]OK[% END %] absolute top-0 left-0'></div>
+              [% END %]
+              <span class='absolute top-0 left-0' style='margin-left: 3px;' title="[% IF s.memfree; sprintf("%.d", perc*100); "% used"; END %]">
+                [% IF s.memtotal; n = reduce_number(s.memtotal*1024*1024, 'B', 1024); sprintf('%.1f %s',n.0, n.1); END %]
+              </span>
+            </td>
+            <td class='relative'>
+              [% IF s.omd_disk_total; perc = ( s.omd_disk_total - s.omd_disk_free ) / s.omd_disk_total %][%IF perc > 1; perc = 1; END %]
+              <div style='width: [% 100 * perc %]%; height: 100%;' class='[% IF perc > 0.9 %]CRITICAL[% ELSIF perc > 0.8 %]WARNING[% ELSE %]OK[% END %] absolute top-0 left-0'></div>
+              [% END %]
+              <span class='absolute top-0 left-0' style='margin-left: 3px;' title="[% IF s.omd_disk_total; sprintf("%.d", perc*100); "% used"; END %]">
+                [% IF s.omd_disk_total; n = reduce_number(s.omd_disk_total*1024, 'B', 1024); sprintf('%.1f %s',n.0, n.1); END %]
+              </span>
+            </td>
             [% END %]
             <td class="text-center">
               <form action="node_control.cgi" method="POST">
@@ -85,6 +114,12 @@
                   <div class="spinner" title="site is gathering facts right now"></div>
                   [% ELSE %]
                     <a href="#" class="js-update-btn" onclick="return send_form_in_background_and_reload(this, {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts'></i></a>
+                  [% END %]
+
+                  [% remote_thruk_url = get_remote_thruk_url(c, s.peer_key); IF remote_thruk_url %]
+                    <a href="proxy.cgi/[% s.peer_key | html %][% remote_thruk_url %]" target="_blank"><i class="fa-solid fa-desktop text-sm" title='Open remote site'></i></a>
+                  [% ELSE %]
+                    <a href="[% url_prefix %]" target="_blank"><i class="fa-solid fa-desktop text-sm" title='Open local site'></i></a>
                   [% END %]
                 </div>
               </form>

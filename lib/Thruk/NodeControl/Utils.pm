@@ -5,6 +5,8 @@ use strict;
 
 use Cpanel::JSON::XS ();
 
+use Thruk::Controller::proxy ();
+
 =head1 NAME
 
 Thruk::NodeControl::Utils - Helper for the node control addon
@@ -93,6 +95,18 @@ sub _ansible_get_facts {
     chomp($omd_site);
     $f->{'omd_site'} = $omd_site;
 
+    my(undef, $omd_disk) = _remote_cmd($c, $peer, ['df -k .']);
+    if($omd_disk =~ m/^.*\s+(\d+)\s+(\d+)\s+(\d+)\s+/gmx) {
+        $f->{'omd_disk_total'} = $1;
+        $f->{'omd_disk_free'}  = $3;
+    }
+
+    my(undef, $omd_cpu) = _remote_cmd($c, $peer, ['top -bn2 | grep Cpu | tail -n 1']);
+    if($omd_cpu =~ m/Cpu/gmx) {
+        my @val = split/\s+/, $omd_cpu;
+        $f->{'omd_cpu_perc'}  = (100-$val[7])/100;
+    }
+
     Thruk::Utils::IO::json_lock_store($file, $f, { pretty => 1 });
     return($f);
 }
@@ -100,8 +114,7 @@ sub _ansible_get_facts {
 ##########################################################
 sub _remote_cmd {
     my($c, $peer, $cmd) = @_;
-    # TODO: cmd does not end cascaded down
-    my($rc, $out) = @{$peer->{'class'}->request("Thruk::Utils::IO::cmd", ['Thruk::Context', $cmd])};
+    my($rc, $out) = $peer->cmd($c, $cmd);
     return($rc, $out);
 }
 
