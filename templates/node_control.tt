@@ -1,0 +1,104 @@
+﻿[% PROCESS _header.tt js="plugins/node_control/node_control.js" %]
+[% PROCESS _message.tt %]
+[% USE date %]
+
+<div class="flexrow justify-between gap-x-1">
+  [% PROCESS _infobox.tt %]
+
+  <div class="card min-w-[400px]">
+    <div class="head">
+      <h3>Options</h3>
+    </div>
+    <form action="node_control.cgi" method="POST" onsubmit="setFormBtnSpinner(this);">
+      <input type="hidden" name="action" value="save_options">
+      <div class="flexrow flex-nowrap gap-2">
+        <table class="cellspacing-x">
+          <tr>
+            <td class="w-0">OMD Default Version</td>
+            <td>
+              <select name='omd_default_version' class="w-full">
+                <option>[% omd_default_version %]</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td>Parallel Tasks</td>
+            <td><input type="text" name="parallel" value="[% ms_parallel %]" class="w-8"></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>
+              <input type='submit' value='Apply' class="w-24 mt-auto">
+            </td>
+          </tr>
+        </table>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  var ms_parallel = [% ms_parallel %];
+</script>
+
+<div class="card w-full mt-5 min-w-[800px]">
+  <div class="head p-0 justify-between border-0">
+    <div class="mx-2">
+      [% PROCESS _table_search_field.tt ids=["msTable"] %]
+    </div>
+    <div class="grow"></div>
+    <span class="tabs active" id="tabs-managed_head">Nodes</span>
+    <div class="grow"></div>
+    <div class="w-48"></div>
+  </div>
+  <div class="mainTable">
+    <table class="mainTable js-striped" id="msTable">
+      <thead>
+        <tr>
+          <th class="w-32">Section</th>
+          <th class="w-32">Hostname</th>
+          <th class="w-32">OMD</th>
+          <th class="w-32">OS</th>
+          <th class="w-6">
+            <div class="flexrow flex-nowrap gap-1">
+              <a href="#" onclick="return ms_run_all(this, '.js-update-btn', {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts For All Visible Servers'></i></a>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        [% FOREACH s = data %]
+          <tr class="js-tabs tabs-managed" id="row_[% s.peer_key | html %]">
+            <td>[% s.section | html %]</td>
+            <td><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/">[% s.omd_site | html %]@[% s.host_name | html %]</a></td>
+            [% IF s.last_error %]
+            <td colspan="2" class="textALERT">[% s.last_error | html %]</td>
+            [% ELSE %]
+            <td>[% s.omd_version | html %]</td>
+            <td>[% s.os_name | html %] [% s.os_version | html %]</td>
+            [% END %]
+            <td class="text-center">
+              <form action="node_control.cgi" method="POST">
+                <input type="hidden" name="peer" value="[% s.peer_key | html %]">
+                <div class="flexrow flex-nowrap gap-1">
+                  [% IF s.gathering %]
+                  <div class="spinner" title="site is gathering facts right now"></div>
+                  [% ELSE %]
+                    <a href="#" class="js-update-btn" onclick="return send_form_in_background_and_reload(this, {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts'></i></a>
+                  [% END %]
+                </div>
+              </form>
+            </td>
+          </tr>
+        [% END %]
+      </tbody>
+    </table>
+  </div>
+  <div class="mainTableFooter">
+    <div class="flex-1 self-center">
+      [% PROCESS _pager_total_items.tt pager = { total_items => data.size } %]
+    </div>
+  </div>
+</div>
+
+[% PROCESS _footer.tt %]
