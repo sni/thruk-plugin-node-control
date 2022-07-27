@@ -17,7 +17,9 @@
             <td class="w-0">OMD Default Version</td>
             <td>
               <select name='omd_default_version' class="w-full">
-                <option>[% omd_default_version %]</option>
+                [% FOREACH v = omd_available_versions %]
+                  <option[% IF v == omd_default_version %] selected[% END %]>[% v | html %]</option>
+                [% END %]
               </select>
             </td>
           </tr>
@@ -77,9 +79,9 @@
             <td><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/">[% s.host_name | html %]</a></td>
             <td>[% s.omd_site | html %]</td>
             [% IF s.last_error %]
-            <td colspan="5" class="textALERT whitespace-pre">[% s.last_error | html %]</td>
+            <td colspan="5" class="textALERT whitespace-pre max-w-md truncate overflow-hidden">[% s.last_error | html %]</td>
             [% ELSE %]
-            <td>[% s.omd_version | html %]</td>
+            <td class="[% IF omd_default_version != "omd-" _ s.omd_version %]WARNING[% END %]">[% s.omd_version | html %]</td>
             <td>[% s.os_name | html %] [% s.os_version | html %]</td>
             <td class='relative'>
               [% IF s.cpu_perc; %][%IF s.cpu_perc > 1; s.cpu_perc = 1; END %]
@@ -101,7 +103,7 @@
               [% IF s.omd_disk_total; perc = ( s.omd_disk_total - s.omd_disk_free ) / s.omd_disk_total %][%IF perc > 1; perc = 1; END %]
               <div style='width: [% 100 * perc %]%; height: 100%;' class='[% IF perc > 0.9 %]CRITICAL[% ELSIF perc > 0.8 %]WARNING[% ELSE %]OK[% END %] absolute top-0 left-0'></div>
               [% END %]
-              <span class='absolute top-0 left-0' style='margin-left: 3px;' title="[% IF s.omd_disk_total; sprintf("%.d", perc*100); "% used"; END %]">
+              <span class='absolute top-0 left-0' style='margin-left: 3px;' title="[% IF s.omd_disk_total %][% sprintf("%.d", perc*100) %]% used, [% n = reduce_number(s.omd_disk_free*1024, 'B', 1024); sprintf('%.1f %s',n.0, n.1) %] free[% END %]">
                 [% IF s.omd_disk_total; n = reduce_number(s.omd_disk_total*1024, 'B', 1024); sprintf('%.1f %s',n.0, n.1); END %]
               </span>
             </td>
