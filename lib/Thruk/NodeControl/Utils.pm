@@ -32,8 +32,6 @@ update controlled nodes cronjobs
 sub update_cron_file {
     my($c) = @_;
 
-    # TODO: add daily cron to update facts
-
     return 1;
 }
 
@@ -222,7 +220,8 @@ sub _ansible_available_packages {
         die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
     }
     my @pkgs = ($pkgs =~ m/^(omd\-\S+?)(?:\s|\.x86_64)/gmx);
-    @pkgs = grep(!/^omd-labs-edition/mx, @pkgs); # remove meta packages
+    @pkgs = grep(!/^(omd-labs-edition|omd-daily)/mx, @pkgs); # remove meta packages
+    @pkgs = sort @pkgs;
     return({ omd_packages_available => \@pkgs });
 }
 
