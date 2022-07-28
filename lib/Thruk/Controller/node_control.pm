@@ -72,8 +72,6 @@ sub index {
 sub _node_action {
     my($c, $action) = @_;
 
-    return unless Thruk::Utils::check_csrf($c);
-
     my $key  = $c->req->parameters->{'peer'};
     if(!$key) {
         return({ json => {'success' => 0, "error" => "no peer key supplied" } });
@@ -84,6 +82,7 @@ sub _node_action {
     }
 
     if($action eq 'update') {
+        return unless Thruk::Utils::check_csrf($c);
         my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
         return({ json => {'success' => 1} });
     }
@@ -97,6 +96,7 @@ sub _node_action {
     }
 
     if($action eq 'omd_status') {
+        return unless Thruk::Utils::check_csrf($c);
         $c->stash->{s}          = Thruk::NodeControl::Utils::get_server($c, $peer);
         $c->stash->{template}   = 'node_control_omd_status.tt';
         $c->stash->{modal}      = $c->req->parameters->{'modal'} // 0;
@@ -104,6 +104,7 @@ sub _node_action {
     }
 
     if($action eq 'omd_stop') {
+        return unless Thruk::Utils::check_csrf($c);
         my $service = $c->req->parameters->{'service'};
         Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "stop");
         Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
@@ -111,6 +112,7 @@ sub _node_action {
     }
 
     if($action eq 'omd_start') {
+        return unless Thruk::Utils::check_csrf($c);
         my $service = $c->req->parameters->{'service'};
         Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "start");
         Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
@@ -118,6 +120,7 @@ sub _node_action {
     }
 
     if($action eq 'omd_restart') {
+        return unless Thruk::Utils::check_csrf($c);
         my $service = $c->req->parameters->{'service'};
         Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "restart");
         Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
