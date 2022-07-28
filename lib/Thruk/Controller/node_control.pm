@@ -37,7 +37,8 @@ sub index {
     $c->stash->{template}              = 'node_control.tt';
     $c->stash->{infoBoxTitle}          = 'Node Control';
 
-    my $parallel_actions     = 3; # TODO: add config option
+    my $config               = Thruk::NodeControl::Utils::config($c);
+    my $parallel_actions     = $config->{'parallel_tasks'} // 3;
     $c->stash->{ms_parallel} = $parallel_actions;
 
     my $action = $c->req->parameters->{'action'} || 'list';

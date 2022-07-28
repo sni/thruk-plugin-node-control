@@ -10,7 +10,7 @@ The nodecontrol command can start node control commands.
 
 =head1 SYNOPSIS
 
-  Usage: thruk [globaloptions] nc <cmd> <options>
+  Usage: thruk [globaloptions] nc <cmd> [-w|--worker=<nr>]
 
 =head1 OPTIONS
 
@@ -66,51 +66,53 @@ sub cmd {
         return("node control plugin is not enabled.\n", 1);
     }
 
+    my $config = Thruk::NodeControl::Utils::config($c);
+    # parse options
+    my $opt = {
+      'worker' => $config->{'parallel_tasks'} // 3,
+    };
+    Getopt::Long::Configure('no_ignore_case');
+    Getopt::Long::Configure('bundling');
+    Getopt::Long::Configure('pass_through');
+    Getopt::Long::GetOptionsFromArray($commandoptions,
+       "w|worker=i"     => \$opt->{'worker'},
+    ) or do {
+        return(Thruk::Utils::CLI::get_submodule_help(__PACKAGE__));
+    };
+
     my $mode = shift @{$commandoptions};
     my($output, $rc) = ("", 0);
 
-    if($mode eq 'facts') {
+    if($mode eq 'facts' || $mode eq 'runtime') {
+        my $peers = [];
         my $backend = shift @{$commandoptions};
         if($backend && $backend ne 'all') {
             my $peer = $c->db->get_peer_by_key($backend);
             if(!$peer) {
                 _fatal("no such peer: ".$backend);
             }
-            my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
-            if(!$facts || $facts->{'last_error'}) {
-                return(sprintf("%s update failed: %s\n", $peer->{'name'}, ($facts->{'last_error'}//'unknown error')), 1);
+            push @{$peers}, $backend;
+        } else {
+            for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
+                push @{$peers}, $peer->{'key'};
             }
-            return(sprintf("%s updated sucessfully: OK\n", $peer->{'name'}), 0);
         }
-        for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
-            my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+
+        scale_peers($c, $opt->{'worker'}, $peers, sub {
+            my($peer_key) = @_;
+            my $peer = $c->db->get_peer_by_key($peer_key);
+            my $facts;
+            if($mode eq 'facts') {
+                $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+            }
+            if($mode eq 'runtime') {
+                $facts = Thruk::NodeControl::Utils::update_runtime_data($c, $peer);
+            }
             if(!$facts || $facts->{'last_error'}) {
-                _error("%s update failed: %s\n", $peer->{'name'}, ($facts->{'last_error'}//'unknown error'));
+                _error("%s updating %s failed: %s\n", $peer->{'name'}, $mode, ($facts->{'last_error'}//'unknown error'));
             }
-            _info("%s updated sucessfully: OK\n", $peer->{'name'});
-        }
-        return("", 0);
-    }
-    elsif($mode eq 'runtime') {
-        my $backend = shift @{$commandoptions};
-        if($backend && $backend ne 'all') {
-            my $peer = $c->db->get_peer_by_key($backend);
-            if(!$peer) {
-                _fatal("no such peer: ".$backend);
-            }
-            my $facts = Thruk::NodeControl::Utils::update_runtime_data($c, $peer);
-            if(!$facts || $facts->{'last_error'}) {
-                return(sprintf("%s update failed: %s\n", $peer->{'name'}, ($facts->{'last_error'}//'unknown error')), 1);
-            }
-            return(sprintf("%s updated sucessfully: OK\n", $peer->{'name'}), 0);
-        }
-        for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
-            my $facts = Thruk::NodeControl::Utils::update_runtime_data($c, $peer);
-            if(!$facts || $facts->{'last_error'}) {
-                _error("%s update failed: %s\n", $peer->{'name'}, ($facts->{'last_error'}//'unknown error'));
-            }
-            _info("%s updated sucessfully: OK\n", $peer->{'name'});
-        }
+            _info("%s updated %s sucessfully: OK\n", $peer->{'name'}, $mode);
+        });
         return("", 0);
     } else {
         return(Thruk::Utils::CLI::get_submodule_help(__PACKAGE__));
@@ -118,6 +120,17 @@ sub cmd {
 
     $c->stats->profile(end => "_cmd_nc()");
     return($output, $rc);
+}
+
+##############################################
+sub scale_peers {
+    my($c, $workernum, $peers, $sub) = @_;
+    Thruk::Utils::scale_out(
+        scale  => $workernum,
+        jobs   => $peers,
+        worker => $sub,
+        collect => sub {},
+    );
 }
 
 ##############################################

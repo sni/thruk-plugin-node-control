@@ -163,7 +163,7 @@ sub _ansible_get_facts {
     my $pkgs    = _ansible_available_packages($c, $peer, $f);
 
     # merge hashes
-    $f = {%{$f}, %{$runtime}, %{$pkgs}};
+    $f = {%{$f//{}}, %{$runtime//{}}, %{$pkgs//{}}};
 
     Thruk::Utils::IO::json_lock_store($file, $f, { pretty => 1 });
     return($f);
@@ -292,6 +292,27 @@ sub omd_service {
         _warn("omd cmd failed: %s", $out);
     }
     return;
+}
+
+##########################################################
+
+=head2 config
+
+  config($c)
+
+return node control config
+
+=cut
+sub config {
+    my($c) = @_;
+    my $file = $c->config->{'var_path'}.'/node_control/_conf.json';
+    my $var;
+    if(-e $file) {
+        $var = Thruk::Utils::IO::json_lock_retrieve($file);
+    }
+    # merge var into config
+    my $conf = {%{$c->config->{'Thruk::Plugin::NodeControl'}//{}}, %{$var//{}}};
+    return($conf);
 }
 
 ##########################################################
