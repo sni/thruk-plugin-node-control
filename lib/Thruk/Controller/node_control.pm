@@ -40,34 +40,19 @@ sub index {
 
     my $action = $c->req->parameters->{'action'} || 'list';
 
-    if($action eq 'update') {
-        my $key   = $c->req->parameters->{'peer'};
-        my $peer  = $c->db->get_peer_by_key($key);
-        my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+    if($action && $action ne 'list') {
+        eval {
+            return _node_action($c, $action);
+        };
+        if($@) {
+            _warn("action %s failed: %s", $action, $@);
+            return({ json => {'success' => 0, 'error' => $@} });
+        }
     }
 
     my $servers = [];
     for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
-        my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 0);
-        my $server = {
-            peer_key                => $peer->{'key'},
-            section                 => $peer->{'section'},
-            gathering               => $facts->{'gathering'} || 0,
-            host_name               => $facts->{'ansible_facts'}->{'ansible_fqdn'} // $peer->{'name'},
-            omd_version             => $facts->{'omd_version'} // '',
-            omd_site                => $facts->{'omd_site'} // '',
-            os_name                 => $facts->{'ansible_facts'}->{'ansible_distribution'} // '',
-            os_version              => $facts->{'ansible_facts'}->{'ansible_distribution_version'} // '',
-            cpu_cores               => $facts->{'ansible_facts'}->{'ansible_processor_vcpus'} // '',
-            cpu_perc                => $facts->{'omd_cpu_perc'} // '',
-            memtotal                => $facts->{'ansible_facts'}->{'ansible_memtotal_mb'} // '',
-            memfree                 => $facts->{'ansible_facts'}->{'ansible_memory_mb'}->{'nocache'}->{'free'} // '',
-            omd_disk_total          => $facts->{'omd_disk_total'} // '',
-            omd_disk_free           => $facts->{'omd_disk_free'} // '',
-            omd_available_versions  => $facts->{'omd_packages_available'} // [],
-            last_error              => $facts->{'last_error'} // '',
-        };
-        push @{$servers}, $server;
+        push @{$servers}, Thruk::NodeControl::Utils::get_server($c, $peer);
     }
 
     $c->stash->{omd_default_version}    = "omd-".$servers->[0]->{omd_version};
@@ -79,6 +64,61 @@ sub index {
     $c->stash->{data} = $servers;
 
     return 1;
+}
+
+##########################################################
+sub _node_action {
+    my($c, $action) = @_;
+
+    my $key  = $c->req->parameters->{'peer'};
+    if(!$key) {
+        return({ json => {'success' => 0, "error" => "no peer key supplied" } });
+    }
+    my $peer = $c->db->get_peer_by_key($key);
+    if(!$peer) {
+        return({ json => {'success' => 0, "error" => "no such peer found by key" } });
+    }
+
+    if($action eq 'update') {
+        my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+        return({ json => {'success' => 1} });
+    }
+
+    if($action eq 'facts') {
+        $c->stash->{s}          = Thruk::NodeControl::Utils::get_server($c, $peer);
+        $c->stash->{template}   = 'node_control_facts.tt';
+        $c->stash->{modal}      = $c->req->parameters->{'modal'} // 0;
+        $c->stash->{no_tt_trim} = 1;
+        return 1;
+    }
+
+    if($action eq 'omd_status') {
+        $c->stash->{s}          = Thruk::NodeControl::Utils::get_server($c, $peer);
+        $c->stash->{template}   = 'node_control_omd_status.tt';
+        $c->stash->{modal}      = $c->req->parameters->{'modal'} // 0;
+        return 1;
+    }
+
+    if($action eq 'omd_stop') {
+        my $service = $c->req->parameters->{'service'};
+        Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "stop");
+        Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
+        return({ json => {'success' => 1} });
+    }
+
+    if($action eq 'omd_start') {
+        my $service = $c->req->parameters->{'service'};
+        Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "start");
+        Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
+        return({ json => {'success' => 1} });
+    }
+
+    if($action eq 'omd_restart') {
+        my $service = $c->req->parameters->{'service'};
+        Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "restart");
+        Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
+        return({ json => {'success' => 1} });
+    }
 }
 
 ##########################################################

@@ -1,6 +1,5 @@
 ﻿[% PROCESS _header.tt js="plugins/node-control/node_control.js" %]
 [% PROCESS _message.tt %]
-[% USE date %]
 
 <div class="flexrow justify-between gap-x-1">
   [% PROCESS _infobox.tt %]
@@ -61,29 +60,50 @@
           <th class="">Hostname</th>
           <th class="w-32">Site</th>
           <th class="w-32">OMD</th>
+          <th class="w-24">OMD Status</th>
           <th class="w-32">OS</th>
+          <th class="w-24">Virt.</th>
           <th class="w-24">CPU</th>
           <th class="w-24">Memory</th>
           <th class="w-24">Disk</th>
           <th class="w-8">
             <div class="flexrow flex-nowrap gap-1">
-              <a href="#" onclick="return ms_run_all(this, '.js-update-btn', {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts For All Visible Servers'></i></a>
+              <a href="#" onclick="return nc_run_all(this, '.js-update-btn', {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts For All Visible Servers'></i></a>
             </div>
           </th>
         </tr>
       </thead>
       <tbody>
         [% FOREACH s = data %]
-          <tr class="js-tabs tabs-managed" id="row_[% s.peer_key | html %]">
-            <td>[% IF s.section != "Default"; s.section | html; END %]</td>
-            <td><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/">[% s.host_name | html %]</a></td>
-            <td>[% s.omd_site | html %]</td>
+          <tr class="js-tabs tabs-managed" id="node_row_[% s.peer_key | html %]">
+            <td class="align-top">[% IF s.section != "Default"; s.section | html; END %]</td>
+            <td class="align-top"><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/">[% s.host_name | html %]</a></td>
+            <td class="align-top">[% s.omd_site | html %]</td>
             [% IF s.last_error %]
-            <td colspan="5" class="textALERT whitespace-pre max-w-md truncate overflow-hidden">[% s.last_error | html %]</td>
+            <td colspan="7" class="textALERT whitespace-pre max-w-md truncate overflow-hidden clickable" onclick="toggleElement(jQuery(this).find('SPAN')[0])">[% lines = s.last_error.split("\n"); lines.shift | html %]<br><span class="hidden">[% lines.join("\n") %]</span></td>
             [% ELSE %]
-            <td class="[% IF omd_default_version != "omd-" _ s.omd_version %]WARNING[% END %]">[% s.omd_version | html %]</td>
-            <td>[% s.os_name | html %] [% s.os_version | html %]</td>
-            <td class='relative'>
+            <td class="align-top [% IF s.omd_version && omd_default_version != "omd-" _ s.omd_version %]WARNING[% END %]">[% s.omd_version | html %]</td>
+            <td class="align-top clickable" onclick="openModalWindowUrl('node_control.cgi?action=omd_status&modal=1&peer=[% s.peer_key | html %]');">
+              [% IF s.omd_status && s.omd_status.exists("OVERALL") %]
+                [% IF s.omd_status.OVERALL == 0 %]
+                  <div class="badge OK">OK</div>
+                [% ELSE %]
+                  [% failed = []; %]
+                  [% FOREACH service IN s.omd_status.keys.sort %]
+                    [% IF service == "OVERALL"; NEXT; END %]
+                    [% IF s.omd_status.$service != 0; failed.push(service); END %]
+                  [% END %]
+                  [% IF failed.size == 1 %]
+                    <div class="badge WARNING">[% failed.0 %]</div>
+                  [% ELSE %]
+                    <div class="badge WARNING">[% failed.size %] stopped</div>
+                  [% END %]
+                [% END %]
+              [% END %]
+            </td>
+            <td class="align-top clickable" onclick="openModalWindowUrl('node_control.cgi?action=facts&modal=1&peer=[% s.peer_key | html %]');">[% s.os_name | html %] [% s.os_version | html %]</td>
+            <td>[% s.machine_type %]</td>
+            <td class='align-top relative'>
               [% IF s.cpu_perc; %][%IF s.cpu_perc > 1; s.cpu_perc = 1; END %]
               <div style='width: [% 100 * s.cpu_perc %]%; height: 100%;' class='[% IF s.cpu_perc > 0.9 %]CRITICAL[% ELSIF s.cpu_perc > 0.8 %]WARNING[% ELSE %]OK[% END %] absolute top-0 left-0'></div>
               [% END %]
@@ -91,7 +111,7 @@
                 [% IF s.cpu_cores; s.cpu_cores; " Cores"; END %]
               </span>
             </td>
-            <td class='relative'>
+            <td class='align-top relative'>
               [% IF s.memfree; perc = ( s.memtotal - s.memfree ) / s.memtotal %][%IF perc > 1; perc = 1; END %]
               <div style='width: [% 100 * perc %]%; height: 100%;' class='[% IF perc > 0.9 %]CRITICAL[% ELSIF perc > 0.8 %]WARNING[% ELSE %]OK[% END %] absolute top-0 left-0'></div>
               [% END %]
@@ -99,7 +119,7 @@
                 [% IF s.memtotal; n = reduce_number(s.memtotal*1024*1024, 'B', 1024); sprintf('%.1f %s',n.0, n.1); END %]
               </span>
             </td>
-            <td class='relative'>
+            <td class='align-top relative'>
               [% IF s.omd_disk_total; perc = ( s.omd_disk_total - s.omd_disk_free ) / s.omd_disk_total %][%IF perc > 1; perc = 1; END %]
               <div style='width: [% 100 * perc %]%; height: 100%;' class='[% IF perc > 0.9 %]CRITICAL[% ELSIF perc > 0.8 %]WARNING[% ELSE %]OK[% END %] absolute top-0 left-0'></div>
               [% END %]
@@ -108,7 +128,7 @@
               </span>
             </td>
             [% END %]
-            <td class="text-center">
+            <td class="align-top text-center">
               <form action="node_control.cgi" method="POST">
                 <input type="hidden" name="peer" value="[% s.peer_key | html %]">
                 <div class="flexrow flex-nowrap gap-1">
