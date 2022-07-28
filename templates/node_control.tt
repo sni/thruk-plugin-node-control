@@ -172,7 +172,7 @@
                   [% IF s.cleaning %]
                   <div class="spinner" title="site is cleaning right now"></div>
                   [% ELSE %]
-                    <a href="#" class="js-cleanup-btn [% IF s.omd_cleanable.size == 0 %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'cleanup'})"><i class="fa-solid fa-broom text-sm" title='Run omd cleanup'></i></a>
+                    <a href="#" class="js-cleanup-btn [% IF s.omd_cleanable.size == 0 %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'cleanup'})"><i class="fa-solid fa-broom text-sm" title='Run omd cleanup to remove:\n[% s.omd_cleanable.join("\n") %]'></i></a>
                   [% END %]
                 </div>
               </form>
