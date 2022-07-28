@@ -14,6 +14,7 @@
   </div>
   <div class="body">
     <form action="node_control.cgi" method="POST">
+      <input type="hidden" name="CSRFtoken" value="[% get_user_token(c) %]">
       <table class="w-fit mx-auto innercellborder">
         [% FOREACH service IN s.omd_status.keys.sort %]
           [% IF service == "OVERALL"; NEXT; END %]

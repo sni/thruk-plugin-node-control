@@ -4,7 +4,9 @@ use warnings;
 use strict;
 
 use Thruk::Action::AddDefaults ();
+use Thruk::Backend::Manager ();
 use Thruk::NodeControl::Utils ();
+use Thruk::Utils::Log qw/:all/;
 
 =head1 NAME
 
@@ -69,6 +71,8 @@ sub index {
 ##########################################################
 sub _node_action {
     my($c, $action) = @_;
+
+    return unless Thruk::Utils::check_csrf($c);
 
     my $key  = $c->req->parameters->{'peer'};
     if(!$key) {

@@ -10,6 +10,7 @@
     </div>
     <form action="node_control.cgi" method="POST" onsubmit="setFormBtnSpinner(this);">
       <input type="hidden" name="action" value="save_options">
+      <input type="hidden" name="CSRFtoken" value="[% get_user_token(c) %]">
       <div class="flexrow flex-nowrap gap-2">
         <table class="cellspacing-x">
           <tr>
@@ -131,6 +132,7 @@
             <td class="align-top text-center">
               <form action="node_control.cgi" method="POST">
                 <input type="hidden" name="peer" value="[% s.peer_key | html %]">
+                <input type="hidden" name="CSRFtoken" value="[% get_user_token(c) %]">
                 <div class="flexrow flex-nowrap gap-1">
                   [% IF s.gathering %]
                   <div class="spinner" title="site is gathering facts right now"></div>

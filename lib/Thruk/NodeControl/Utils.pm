@@ -2,11 +2,10 @@ package Thruk::NodeControl::Utils;
 
 use warnings;
 use strict;
-
 use Cpanel::JSON::XS ();
 
 use Thruk::Constants qw/:peer_states/;
-use Thruk::Controller::proxy ();
+use Thruk::Utils::IO ();
 use Thruk::Utils::Log qw/:all/;
 
 =head1 NAME
@@ -105,8 +104,8 @@ return ansible gather facts
 =cut
 sub ansible_get_facts {
     my($c, $peer, $refresh) = @_;
-    Thruk::Utils::IO::mkdir_r($c->{'config'}->{'var_path'}.'/node_control');
-    my $file = $c->{'config'}->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
+    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     my $f;
     eval {
         $f = _ansible_get_facts($c, $peer, $refresh);
@@ -128,8 +127,8 @@ update runtime data and return facts
 =cut
 sub update_runtime_data {
     my($c, $peer, $skip_cpu) = @_;
-    Thruk::Utils::IO::mkdir_r($c->{'config'}->{'var_path'}.'/node_control');
-    my $file = $c->{'config'}->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
+    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => $$ }, { pretty => 1, allow_empty => 1 });
     my $runtime = {};
     eval {
@@ -148,7 +147,7 @@ sub update_runtime_data {
 ##########################################################
 sub _ansible_get_facts {
     my($c, $peer, $refresh) = @_;
-    my $file = $c->{'config'}->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     if(!$refresh && -e $file) {
         return(Thruk::Utils::IO::json_lock_retrieve($file));
     }
