@@ -71,7 +71,7 @@
             <div class="flexrow flex-nowrap gap-1">
               <a href="#" onclick="return nc_run_all(this, '.js-update-btn', {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update facts for all visible servers'></i></a>
               <a href="#" onclick="return nc_run_all(this, '.js-install-btn', {action: 'omd_install'})"><i class="fa-solid fa-truck-arrow-right text-sm" title='Run omd install for all visible servers'></i></a>
-              <a href="#" onclick="return nc_run_all(this, '.js-update-btn', {action: 'omd_update'})"><i class="fa-solid fa-square-up-right text-sm" title='Run omd update for all visible servers'></i></a>
+              <a href="#" onclick="return nc_run_all(this, '.js-omd-update-btn', {action: 'omd_update'})"><i class="fa-solid fa-square-up-right text-sm" title='Run omd update for all visible servers'></i></a>
               <a href="#" onclick="return nc_run_all(this, '.js-cleanup-btn', {action: 'cleanup'})"><i class="fa-solid fa-broom text-sm" title='Run omd cleanup for all visible servers'></i></a>
             </div>
           </th>
@@ -166,7 +166,7 @@
                   [% IF s.updating %]
                   <div class="spinner" title="site is updating omd right now"></div>
                   [% ELSE %]
-                    <a href="#" class="js-update-btn [% IF s.omd_version == omd_default_version %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_update'})"><i class="fa-solid fa-square-up-right text-sm" title='Update to omd default version'></i></a>
+                    <a href="#" class="js-omd-update-btn [% IF s.omd_version == omd_default_version || !has_installed %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_update'})"><i class="fa-solid fa-square-up-right text-sm" title='Update to omd default version'></i></a>
                   [% END %]
 
                   [% IF s.cleaning %]
