@@ -134,6 +134,29 @@ sub _node_action {
         Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
         return({ json => {'success' => 1} });
     }
+
+    if($action eq 'cleanup') {
+        return unless Thruk::Utils::check_csrf($c);
+        # TODO: ...
+        Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+        return({ json => {'success' => 1} });
+    }
+
+    if($action eq 'omd_install') {
+        return unless Thruk::Utils::check_csrf($c);
+        # TODO: ...
+        Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+        return({ json => {'success' => 1} });
+    }
+
+    if($action eq 'omd_update') {
+        return unless Thruk::Utils::check_csrf($c);
+        # TODO: ...
+        Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+        return({ json => {'success' => 1} });
+    }
+
+    return;
 }
 
 ##########################################################

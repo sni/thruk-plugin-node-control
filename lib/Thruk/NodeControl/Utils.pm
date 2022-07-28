@@ -71,8 +71,13 @@ sub get_server {
         peer_key                => $peer->{'key'},
         section                 => $peer->{'section'},
         gathering               => $facts->{'gathering'} || 0,
+        cleaning                => $facts->{'cleaning'} || 0,
+        installing              => $facts->{'installing'} || 0,
+        updating                => $facts->{'updating'} || 0,
         host_name               => $facts->{'ansible_facts'}->{'ansible_fqdn'} // $peer->{'name'},
         omd_version             => $facts->{'omd_version'} // '',
+        omd_versions            => $facts->{'omd_versions'} // [],
+        omd_cleanable           => $facts->{'omd_cleanable'} // [],
         omd_site                => $facts->{'omd_site'} // '',
         omd_status              => $facts->{'omd_status'} // {},
         os_name                 => $facts->{'ansible_facts'}->{'ansible_distribution'} // '',
@@ -222,7 +227,39 @@ sub _ansible_available_packages {
     my @pkgs = ($pkgs =~ m/^(omd\-\S+?)(?:\s|\.x86_64)/gmx);
     @pkgs = grep(!/^(omd-labs-edition|omd-daily)/mx, @pkgs); # remove meta packages
     @pkgs = reverse sort @pkgs;
-    return({ omd_packages_available => \@pkgs });
+    @pkgs = map { $_ =~ s/^omd\-//gmx; $_; } @pkgs;
+
+    # get installed omd versions
+    my $installed;
+    (undef, $installed) = _remote_cmd($c, $peer, ['omd versions']);
+    my @inst = split/\n/, $installed;
+    my $default;
+    for my $i (@inst) {
+        if($i =~ m/\Q(default)\E/mx) {
+            $i =~ s/\s*\Q(default)\E//gmx;
+            $default = $i;
+        }
+    }
+
+    my %omd_sites;
+    my %in_use;
+    my $sites;
+    (undef, $sites) = _remote_cmd($c, $peer, ['omd sites']);
+    my @sites = split/\n/, $sites;
+    for my $s (@sites) {
+        my($name, $version, $comment) = split/\s+/, $s;
+        $omd_sites{$name} = $version;
+        $in_use{$version} = 1;
+    }
+    $in_use{$default} = 1;
+
+    my @cleanable;
+    for my $v (@inst) {
+        next if $in_use{$v};
+        push @cleanable, $v;
+    }
+
+    return({ omd_packages_available => \@pkgs, omd_versions => \@inst, omd_cleanable => \@cleanable, omd_sites => \%omd_sites });
 }
 
 ##########################################################

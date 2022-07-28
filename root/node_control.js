@@ -4,10 +4,11 @@ function nc_run_all(mainBtn, cls, extraData) {
 
     var list = [];
     jQuery(cls).each(function(i, el) {
-        if(jQuery(el).is(":visible")) {
+        if(jQuery(el).is(":visible") && !jQuery(el).hasClass("invisible")) {
             list.push(el);
         }
     });
+
     var running = 0;
     var startNext = function() {
         if(list.length == 0) {
