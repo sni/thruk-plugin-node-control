@@ -96,7 +96,6 @@ sub _node_action {
     }
 
     if($action eq 'omd_status') {
-        return unless Thruk::Utils::check_csrf($c);
         $c->stash->{s}          = Thruk::NodeControl::Utils::get_server($c, $peer);
         $c->stash->{template}   = 'node_control_omd_status.tt';
         $c->stash->{modal}      = $c->req->parameters->{'modal'} // 0;
