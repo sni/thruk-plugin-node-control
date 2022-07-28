@@ -13,3 +13,12 @@ All steps have to be done as site user:
 
 You now have a new menu item under System -> Node Control.
 
+## Setup
+
+The controlled sites need to have sudo permissions for omd and their package
+manager.
+
+ - Debian: `siteuser  ALL=(ALL) NOPASSWD: /usr/bin/omd, NOPASSWD: /usr/bin/apt-get`
+ - Centos: `siteuser  ALL=(ALL) NOPASSWD: /usr/bin/omd, NOPASSWD: /usr/bin/dnf`
+
+(replace siteuser with the actual site user name)
