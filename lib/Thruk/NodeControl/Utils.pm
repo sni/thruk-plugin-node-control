@@ -221,7 +221,7 @@ sub _ansible_available_packages {
     }
     my @pkgs = ($pkgs =~ m/^(omd\-\S+?)(?:\s|\.x86_64)/gmx);
     @pkgs = grep(!/^(omd-labs-edition|omd-daily)/mx, @pkgs); # remove meta packages
-    @pkgs = sort @pkgs;
+    @pkgs = reverse sort @pkgs;
     return({ omd_packages_available => \@pkgs });
 }
 
@@ -313,6 +313,23 @@ sub config {
     # merge var into config
     my $conf = {%{$c->config->{'Thruk::Plugin::NodeControl'}//{}}, %{$var//{}}};
     return($conf);
+}
+
+##########################################################
+
+=head2 save_config
+
+  save_config($c)
+
+save config to disk
+
+=cut
+sub save_config {
+    my($c, $newconf) = @_;
+    my $conf = {%{config($c)}, %{$newconf//{}}};
+    my $file = $c->config->{'var_path'}.'/node_control/_conf.json';
+    Thruk::Utils::IO::json_lock_store($file, $conf);
+    return;
 }
 
 ##########################################################

@@ -83,7 +83,11 @@
             [% IF s.last_error %]
             <td colspan="7" class="textALERT whitespace-pre max-w-md truncate overflow-hidden clickable" onclick="toggleElement(jQuery(this).find('SPAN')[0])">[% lines = s.last_error.split("\n"); lines.shift | html %]<br><span class="hidden">[% lines.join("\n") %]</span></td>
             [% ELSE %]
-            <td class="align-top [% IF s.omd_version && omd_default_version != "omd-" _ s.omd_version %]WARNING[% END %]">[% s.omd_version | html %]</td>
+            [% IF s.omd_version && omd_default_version != "omd-" _ s.omd_version %]
+              <td class="align-top WARNING" title="node uses an outdated omd release.">[% s.omd_version | html %]</td>
+            [% ELSE %]
+              <td class="align-top">[% s.omd_version | html %]</td>
+            [% END %]
             <td class="align-top clickable" onclick="openModalWindowUrl('node_control.cgi?action=omd_status&modal=1&peer=[% s.peer_key | html %]');">
               [% IF s.omd_status && s.omd_status.exists("OVERALL") %]
                 [% IF s.omd_status.OVERALL == 0 %]

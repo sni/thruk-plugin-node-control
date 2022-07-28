@@ -52,13 +52,21 @@ sub index {
             return({ json => {'success' => 0, 'error' => $@} });
         }
     }
+    if($action eq 'save_options') {
+        Thruk::NodeControl::Utils::save_config($c, {
+            'parallel_tasks'        => $c->req->parameters->{'parallel'},
+            'omd_default_version'   => $c->req->parameters->{'omd_default_version'},
+        });
+        Thruk::Utils::set_message( $c, { style => 'success_message', msg => 'settings saved sucessfully' });
+        return $c->redirect_to($c->stash->{'url_prefix'}."cgi-bin/node_control.cgi");
+    }
 
     my $servers = [];
     for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
         push @{$servers}, Thruk::NodeControl::Utils::get_server($c, $peer);
     }
 
-    $c->stash->{omd_default_version}    = "omd-".$servers->[0]->{omd_version};
+    $c->stash->{omd_default_version}    = $config->{'omd_default_version'} // "omd-".$servers->[0]->{omd_version};
     $c->stash->{omd_available_versions} = $servers->[0]->{omd_available_versions};
 
     # sort servers by section, host_name, site
