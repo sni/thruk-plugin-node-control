@@ -263,6 +263,85 @@ sub _ansible_available_packages {
 }
 
 ##########################################################
+
+=head2 omd_install
+
+  omd_install($c, $peer, $version)
+
+installs given version on peer
+
+=cut
+sub omd_install {
+    my($c, $peer, $version) = @_;
+
+    my $facts = _ansible_get_facts($c, $peer, 0);
+    if(!$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}) {
+        die("no package manager");
+    }
+
+    $version = "omd-".$version;
+
+    return(1, "install already running") if $facts->{'installing'};
+
+    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $f = Thruk::Utils::IO::json_lock_patch($file, { 'installing' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+
+    my($rc, $out);
+    eval {
+        if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
+            ($rc, $out) = _remote_cmd($c, $peer, ['sudo -n yum install -y '.$version]);
+        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
+            ($rc, $out) = _remote_cmd($c, $peer, ['sudo -n dnf install -y '.$version]);
+        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
+            ($rc, $out) = _remote_cmd($c, $peer, ['sudo -n apt-get install -y '.$version]);
+        } else {
+            die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
+        }
+
+        ansible_get_facts($c, $peer, 1);
+
+        die($out) unless $rc == 0;
+    };
+    if($@) {
+        $f = Thruk::Utils::IO::json_lock_patch($file, { 'installing' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+    }
+
+    return($rc, $out);
+}
+
+##########################################################
+
+=head2 omd_update
+
+  omd_update($c, $peer, $version)
+
+update site to given version on peer
+
+=cut
+sub omd_update {
+    my($c, $peer, $version) = @_;
+
+    # TODO: ...
+
+    return;
+}
+
+##########################################################
+
+=head2 omd_cleanup
+
+  omd_cleanup($c, $peer)
+
+runs omd cleanup on peer
+
+=cut
+sub omd_cleanup {
+    my($c, $peer) = @_;
+    my($rc, $out) = _remote_cmd($c, $peer, ['sudo -n omd cleanup']);
+    return($rc, $out);
+}
+
+##########################################################
 sub _remote_cmd {
     my($c, $peer, $cmd) = @_;
     my($rc, $out);

@@ -66,7 +66,13 @@ sub index {
         push @{$servers}, Thruk::NodeControl::Utils::get_server($c, $peer);
     }
 
-    $c->stash->{omd_default_version}    = $config->{'omd_default_version'} // "omd-".$servers->[0]->{omd_version};
+    if(!$config->{'omd_default_version'}) {
+        Thruk::NodeControl::Utils::save_config($c, {
+            'omd_default_version'   => $servers->[0]->{omd_version},
+        });
+    }
+
+    $c->stash->{omd_default_version}    = $config->{'omd_default_version'} // $servers->[0]->{omd_version};
     $c->stash->{omd_available_versions} = $servers->[0]->{omd_available_versions};
 
     # sort servers by section, host_name, site
@@ -81,7 +87,8 @@ sub index {
 sub _node_action {
     my($c, $action) = @_;
 
-    my $key  = $c->req->parameters->{'peer'};
+    my $config = Thruk::NodeControl::Utils::config($c);
+    my $key    = $c->req->parameters->{'peer'};
     if(!$key) {
         return({ json => {'success' => 0, "error" => "no peer key supplied" } });
     }
@@ -137,23 +144,23 @@ sub _node_action {
 
     if($action eq 'cleanup') {
         return unless Thruk::Utils::check_csrf($c);
-        # TODO: ...
+        my($rc, $out) = Thruk::NodeControl::Utils::omd_cleanup($c, $peer);
         Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
         return({ json => {'success' => 1} });
     }
 
     if($action eq 'omd_install') {
         return unless Thruk::Utils::check_csrf($c);
-        # TODO: ...
-        Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
-        return({ json => {'success' => 1} });
+        my($rc, $out) = Thruk::NodeControl::Utils::omd_install($c, $peer, $config->{'omd_default_version'});
+        return({ json => {'success' => 1} }) if $rc == 0;
+        return({ json => {'success' => 0, 'error' => $out } });
     }
 
     if($action eq 'omd_update') {
         return unless Thruk::Utils::check_csrf($c);
-        # TODO: ...
-        Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
-        return({ json => {'success' => 1} });
+        my($rc, $out) = Thruk::NodeControl::Utils::omd_update($c, $peer, $config->{'omd_default_version'});
+        return({ json => {'success' => 1} }) if $rc == 0;
+        return({ json => {'success' => 0, 'error' => $out } });
     }
 
     return;
