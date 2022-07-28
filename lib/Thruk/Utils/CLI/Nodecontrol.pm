@@ -24,7 +24,8 @@ The nodecontrol command can start node control commands.
 
     available commands are:
 
-    - facts <backendid|all>             update facts for given backend.
+    - facts   <backendid|all>             update facts for given backend.
+    - runtime <backendid|all>             update runtime data for given backend.
 
 =back
 
@@ -83,6 +84,28 @@ sub cmd {
         }
         for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
             my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+            if(!$facts || $facts->{'last_error'}) {
+                _error("%s update failed: %s\n", $peer->{'name'}, ($facts->{'last_error'}//'unknown error'));
+            }
+            _info("%s updated sucessfully: OK\n", $peer->{'name'});
+        }
+        return("", 0);
+    }
+    elsif($mode eq 'runtime') {
+        my $backend = shift @{$commandoptions};
+        if($backend && $backend ne 'all') {
+            my $peer = $c->db->get_peer_by_key($backend);
+            if(!$peer) {
+                _fatal("no such peer: ".$backend);
+            }
+            my $facts = Thruk::NodeControl::Utils::update_runtime_data($c, $peer);
+            if(!$facts || $facts->{'last_error'}) {
+                return(sprintf("%s update failed: %s\n", $peer->{'name'}, ($facts->{'last_error'}//'unknown error')), 1);
+            }
+            return(sprintf("%s updated sucessfully: OK\n", $peer->{'name'}), 0);
+        }
+        for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
+            my $facts = Thruk::NodeControl::Utils::update_runtime_data($c, $peer);
             if(!$facts || $facts->{'last_error'}) {
                 _error("%s update failed: %s\n", $peer->{'name'}, ($facts->{'last_error'}//'unknown error'));
             }
