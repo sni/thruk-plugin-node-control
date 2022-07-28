@@ -77,7 +77,7 @@ sub get_server {
         omd_status              => $facts->{'omd_status'} // {},
         os_name                 => $facts->{'ansible_facts'}->{'ansible_distribution'} // '',
         os_version              => $facts->{'ansible_facts'}->{'ansible_distribution_version'} // '',
-        machine_type            => $facts->{'ansible_facts'}->{'ansible_virtualization_type'} // '',
+        machine_type            => _machine_type($facts) // '',
         cpu_cores               => $facts->{'ansible_facts'}->{'ansible_processor_vcpus'} // '',
         cpu_perc                => $facts->{'omd_cpu_perc'} // '',
         memtotal                => $facts->{'ansible_facts'}->{'ansible_memtotal_mb'} // '',
@@ -290,6 +290,16 @@ sub omd_service {
     };
     if($@) {
         _warn("omd cmd failed: %s", $out);
+    }
+    return;
+}
+
+##########################################################
+
+sub _machine_type {
+    my($facts) = @_;
+    if($facts->{'ansible_facts'}->{'ansible_virtualization_role'} && $facts->{'ansible_facts'}->{'ansible_virtualization_role'} eq 'guest') {
+        return($facts->{'ansible_facts'}->{'ansible_virtualization_type'});
     }
     return;
 }

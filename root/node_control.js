@@ -18,7 +18,7 @@ function nc_run_all(mainBtn, cls, extraData) {
         }
         running++;
         var btn = list.shift();
-        setBtnSpinner(btn);
+        setBtnSpinner(btn, true);
         var form = jQuery(btn).parents('FORM');
         submitFormInBackground(form, function() {
             running--;
