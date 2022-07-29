@@ -25,7 +25,7 @@
           </tr>
           <tr>
             <td>Parallel Tasks</td>
-            <td><input type="text" name="parallel" value="[% ms_parallel %]" class="w-8"></td>
+            <td><input type="text" name="parallel" value="[% ms_parallel | html %]" class="w-8"></td>
           </tr>
           <tr>
             <td></td>
@@ -40,7 +40,7 @@
 </div>
 
 <script>
-  var ms_parallel = [% ms_parallel %];
+  var ms_parallel = [% ms_parallel | html %];
 </script>
 
 <div class="card w-full mt-5 min-w-[800px]">
@@ -151,29 +151,29 @@
                   [% IF s.gathering %]
                   <div class="spinner" title="site is gathering facts right now"></div>
                   [% ELSE %]
-                    <a href="#" class="js-update-btn" onclick="return send_form_in_background_and_reload(this, {action: 'update'})"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts'></i></a>
+                    <a href="#" class="js-update-btn" onclick="return send_form_in_background_and_reload(this, {action: 'update'}, true)"><i class="fa-solid fa-arrows-rotate text-sm" title='Update Facts'></i></a>
                   [% END %]
 
+                  [% has_installed = 0 %]
                   [% IF s.installing %]
-                  <div class="spinner" title="site is installing omd right now"></div>
+                  <div class="spinner clickable" title="site is installing omd right now" onclick="showJobOutputPopup('[% s.installing | html %]','[% s.peer_key | html %]', 'Install OMD [% omd_default_version | html %] on [% s.host_name | html %]')"></div>
                   [% ELSE %]
-                    [% has_installed = 0; %]
                     [% FOREACH ver = s.omd_versions %]
                       [% IF ver == omd_default_version; has_installed = 1; LAST; END %]
                     [% END %]
-                    <a href="#" class="js-install-btn [% IF has_installed || !s.omd_version %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_install'})"><i class="fa-solid fa-truck-arrow-right text-sm" title='Install omd default version'></i></a>
+                    <a href="#" class="js-install-btn [% IF has_installed || !s.omd_version %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_install'}, true)"><i class="fa-solid fa-truck-arrow-right text-sm" title='Install omd default version'></i></a>
                   [% END %]
 
                   [% IF s.updating %]
-                  <div class="spinner" title="site is updating omd right now"></div>
+                  <div class="spinner clickable" title="site is updating omd right now" onclick="showJobOutputPopup('[% s.updating | html %]','[% s.peer_key | html %]', 'Update site to [% omd_default_version | html %] on [% s.host_name | html %]')"></div>
                   [% ELSE %]
-                    <a href="#" class="js-omd-update-btn [% IF s.omd_version == omd_default_version || !has_installed %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_update'})"><i class="fa-solid fa-square-up-right text-sm" title='Update to omd default version'></i></a>
+                    <a href="#" class="js-omd-update-btn [% IF s.omd_version == omd_default_version || !has_installed %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_update'}, true)"><i class="fa-solid fa-square-up-right text-sm" title='Update to omd default version'></i></a>
                   [% END %]
 
                   [% IF s.cleaning %]
-                  <div class="spinner" title="site is cleaning right now"></div>
+                  <div class="spinner clickable" title="site is cleaning up right now" onclick="showJobOutputPopup('[% s.cleaning | html %]','[% s.peer_key | html %]', 'OMD cleanup on [% s.host_name | html %]')"></div>
                   [% ELSE %]
-                    <a href="#" class="js-cleanup-btn [% IF s.omd_cleanable.size == 0 %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'cleanup'})"><i class="fa-solid fa-broom text-sm" title='Run omd cleanup to remove:&#013;[% s.omd_cleanable.join("&#013;") %]'></i></a>
+                    <a href="#" class="js-cleanup-btn [% IF s.omd_cleanable.size == 0 %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'cleanup'}, true)"><i class="fa-solid fa-broom text-sm" title='Run omd cleanup to remove:&#013;[% s.omd_cleanable.join("&#013;") %]'></i></a>
                   [% END %]
                 </div>
               </form>

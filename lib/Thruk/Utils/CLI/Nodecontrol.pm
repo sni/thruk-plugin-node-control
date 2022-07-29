@@ -109,6 +109,9 @@ sub cmd {
             }
             if($mode eq 'runtime') {
                 $facts = Thruk::NodeControl::Utils::update_runtime_data($c, $peer);
+                if(!$facts->{'ansible_facts'}) {
+                    $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
+                }
             }
             if(!$facts || $facts->{'last_error'}) {
                 _error("%s updating %s failed: %s\n", $peer->{'name'}, $mode, ($facts->{'last_error'}//'unknown error'));

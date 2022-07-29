@@ -64,8 +64,35 @@ return server details
 
 =cut
 sub get_server {
-    my($c, $peer) = @_;
+    my($c, $peer, $config) = @_;
     my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 0);
+    $config = $config || config($c);
+
+    # check if jobs are still running
+    my $save_required = 0;
+    if($facts->{'gathering'} && !kill(0, $facts->{'gathering'})) {
+        $save_required = 1;
+        $facts->{'gathering'} = 0;
+    }
+    for my $key (qw/cleaning installing updating/) {
+        my $job = $facts->{$key};
+        next unless $job;
+        next if $job eq "1"; # starting right now
+        my $data = $peer->job_data($c, $job);
+        if(!$data->{'is_running'}) {
+            $facts->{$key} = 0;
+            if($data->{'rc'} != 0) {
+                $facts->{'last_error'} = $data->{'stdout'}.$data->{'stderr'};
+            }
+            $save_required = 1;
+        }
+    }
+    if($save_required) {
+        Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
+        my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+        Thruk::Utils::IO::json_lock_store($file, $facts, { pretty => 1 });
+    }
+
     $facts->{'last_error'} =~ s/\s+at\s+.*HTTP\.pm\s+line\s+\d+\.//gmx if $facts->{'last_error'};
     my $server = {
         peer_key                => $peer->{'key'},
@@ -93,6 +120,13 @@ sub get_server {
         last_error              => $facts->{'last_error'} // '',
         facts                   => $facts || {},
     };
+
+    # remove current default from cleanable
+    if($server->{'omd_cleanable'}) {
+        my $def = $config->{'omd_default_version'};
+        @{$server->{'omd_cleanable'}} = grep(!/$def/, @{$server->{'omd_cleanable'}}) if $def;
+    }
+
     return($server);
 }
 
@@ -181,26 +215,26 @@ sub _ansible_get_facts {
 sub _runtime_data {
     my($c, $peer, $skip_cpu) = @_;
     my $runtime = {};
-    my(undef, $omd_version) = _remote_cmd($c, $peer, ['omd version -b']);
+    my(undef, $omd_version) = _remote_cmd($c, $peer, 'omd version -b');
     chomp($omd_version);
     $runtime->{'omd_version'} = $omd_version;
 
-    my(undef, $omd_status) = _remote_cmd($c, $peer, ['omd status -b']);
+    my(undef, $omd_status) = _remote_cmd($c, $peer, 'omd status -b');
     my %services = ($omd_status =~ m/^(\S+?)\s+(\d+)/gmx);
     $runtime->{'omd_status'} = \%services;
 
-    my(undef, $omd_site) = _remote_cmd($c, $peer, ['id -un']);
+    my(undef, $omd_site) = _remote_cmd($c, $peer, 'id -un');
     chomp($omd_site);
     $runtime->{'omd_site'} = $omd_site;
 
-    my(undef, $omd_disk) = _remote_cmd($c, $peer, ['df -k version/.']);
+    my(undef, $omd_disk) = _remote_cmd($c, $peer, 'df -k version/.');
     if($omd_disk =~ m/^.*\s+(\d+)\s+(\d+)\s+(\d+)\s+/gmx) {
         $runtime->{'omd_disk_total'} = $1;
         $runtime->{'omd_disk_free'}  = $3;
     }
 
     if(!$skip_cpu) {
-        my(undef, $omd_cpu) = _remote_cmd($c, $peer, ['top -bn2 | grep Cpu | tail -n 1']);
+        my(undef, $omd_cpu) = _remote_cmd($c, $peer, 'top -bn2 | grep Cpu | tail -n 1');
         if($omd_cpu =~ m/Cpu/gmx) {
             my @val = split/\s+/mx, $omd_cpu;
             $runtime->{'omd_cpu_perc'}  = (100-$val[7])/100;
@@ -219,11 +253,11 @@ sub _ansible_available_packages {
 
     my $pkgs;
     if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
-        (undef, $pkgs) = _remote_cmd($c, $peer, ['yum search omd-']);
+        (undef, $pkgs) = _remote_cmd($c, $peer, 'yum search omd-');
     } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
-        (undef, $pkgs) = _remote_cmd($c, $peer, ['dnf search omd-']);
+        (undef, $pkgs) = _remote_cmd($c, $peer, 'dnf search omd-');
     } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-        (undef, $pkgs) = _remote_cmd($c, $peer, ['apt-cache search omd-']);
+        (undef, $pkgs) = _remote_cmd($c, $peer, 'apt-cache search omd-');
     } else {
         die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
     }
@@ -234,7 +268,7 @@ sub _ansible_available_packages {
 
     # get installed omd versions
     my $installed;
-    (undef, $installed) = _remote_cmd($c, $peer, ['omd versions']);
+    (undef, $installed) = _remote_cmd($c, $peer, 'omd versions');
     my @inst = split/\n/mx, $installed;
     my $default;
     for my $i (@inst) {
@@ -247,7 +281,7 @@ sub _ansible_available_packages {
     my %omd_sites;
     my %in_use;
     my $sites;
-    (undef, $sites) = _remote_cmd($c, $peer, ['omd sites']);
+    (undef, $sites) = _remote_cmd($c, $peer, 'omd sites');
     my @sites = split/\n/mx, $sites;
     for my $s (@sites) {
         my($name, $version, $comment) = split/\s+/mx, $s;
@@ -284,32 +318,32 @@ sub omd_install {
 
     $version = "omd-".$version;
 
-    return(1, "install already running") if $facts->{'installing'};
+    return if $facts->{'installing'};
 
     my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     my $f = Thruk::Utils::IO::json_lock_patch($file, { 'installing' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
 
-    my($rc, $out);
+    my($rc, $job);
     eval {
         if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
-            ($rc, $out) = _remote_cmd($c, $peer, ['sudo -n yum install -y '.$version]);
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum install -y '.$version, 1);
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
-            ($rc, $out) = _remote_cmd($c, $peer, ['sudo -n dnf install -y '.$version]);
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf install -y '.$version, 1);
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-            ($rc, $out) = _remote_cmd($c, $peer, ['sudo -n apt-get install -y '.$version]);
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n apt-get install -y '.$version, 1);
         } else {
             die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
         }
 
-        ansible_get_facts($c, $peer, 1);
-
-        die($out) unless $rc == 0;
+        die("starting job failed") unless $job;
     };
     if($@) {
         $f = Thruk::Utils::IO::json_lock_patch($file, { 'installing' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+        return;
     }
 
-    return($rc, $out);
+    Thruk::Utils::IO::json_lock_patch($file, { 'installing' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    return($job);
 }
 
 ##########################################################
@@ -340,16 +374,32 @@ runs omd cleanup on peer
 =cut
 sub omd_cleanup {
     my($c, $peer) = @_;
-    my($rc, $out) = _remote_cmd($c, $peer, ['sudo -n omd cleanup']);
-    return($rc, $out);
+
+    my $facts = _ansible_get_facts($c, $peer, 0);
+    return if $facts->{'cleaning'};
+
+    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $f = Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+
+    my($rc, $job);
+    eval {
+        ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n omd cleanup', 1);
+    };
+    if($@) {
+        $f = Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+        return;
+    }
+
+    Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    return($job);
 }
 
 ##########################################################
 sub _remote_cmd {
-    my($c, $peer, $cmd) = @_;
+    my($c, $peer, $cmd, $background) = @_;
     my($rc, $out);
     eval {
-        ($rc, $out) = $peer->cmd($c, $cmd);
+        ($rc, $out) = $peer->cmd($c, $cmd, $background);
     };
     my $err = $@;
     if($err) {
@@ -357,8 +407,8 @@ sub _remote_cmd {
         # fallback to ssh if possible
         my $facts     = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 0);
         my $host_name = $facts->{'ansible_facts'}->{'ansible_fqdn'};
-        if($host_name) {
-            ($rc, $out) = Thruk::Utils::IO::cmd($c, "ansible all -i $host_name, -m shell -a \"".join(" ", @{$cmd})."\"");
+        if($host_name && !$background) {
+            ($rc, $out) = Thruk::Utils::IO::cmd($c, "ansible all -i $host_name, -m shell -a \"".$cmd."\"");
             if($rc != 0) {
                 die($out);
             }
@@ -372,7 +422,7 @@ sub _remote_cmd {
 ##########################################################
 sub _ansible_adhoc_cmd {
     my($c, $peer, $args) = @_;
-    my($rc, $data) = _remote_cmd($c, $peer, ['ansible all -i localhost, -c local '.$args]);
+    my($rc, $data) = _remote_cmd($c, $peer, 'ansible all -i localhost, -c local '.$args);
     if($rc != 0) {
         die("ansible failed: $rc ".$data);
     }
@@ -405,7 +455,7 @@ sub omd_service {
     my($c, $peer, $service, $cmd) = @_;
     my($rc, $out);
     eval {
-        ($rc, $out) = _remote_cmd($c, $peer, ['omd '.$cmd.' '.$service]);
+        ($rc, $out) = _remote_cmd($c, $peer, 'omd '.$cmd.' '.$service);
     };
     if($@) {
         _warn("omd cmd failed: %s", $out);

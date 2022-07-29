@@ -63,7 +63,7 @@ sub index {
 
     my $servers = [];
     for my $peer (@{Thruk::NodeControl::Utils::get_peers($c)}) {
-        push @{$servers}, Thruk::NodeControl::Utils::get_server($c, $peer);
+        push @{$servers}, Thruk::NodeControl::Utils::get_server($c, $peer, $config);
     }
 
     if(!$config->{'omd_default_version'} && $servers->[0]->{omd_version}) {
@@ -144,23 +144,23 @@ sub _node_action {
 
     if($action eq 'cleanup') {
         return unless Thruk::Utils::check_csrf($c);
-        my($rc, $out) = Thruk::NodeControl::Utils::omd_cleanup($c, $peer);
-        Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
-        return({ json => {'success' => 1} });
+        my $job = Thruk::NodeControl::Utils::omd_cleanup($c, $peer);
+        return({ json => {'success' => 1} }) if $job;
+        return({ json => {'success' => 0, 'error' => "failed to start job" } });
     }
 
     if($action eq 'omd_install') {
         return unless Thruk::Utils::check_csrf($c);
-        my($rc, $out) = Thruk::NodeControl::Utils::omd_install($c, $peer, $config->{'omd_default_version'});
-        return({ json => {'success' => 1} }) if $rc == 0;
-        return({ json => {'success' => 0, 'error' => $out } });
+        my $job = Thruk::NodeControl::Utils::omd_install($c, $peer, $config->{'omd_default_version'});
+        return({ json => {'success' => 1} }) if $job;
+        return({ json => {'success' => 0, 'error' => "failed to start job" } });
     }
 
     if($action eq 'omd_update') {
         return unless Thruk::Utils::check_csrf($c);
-        my($rc, $out) = Thruk::NodeControl::Utils::omd_update($c, $peer, $config->{'omd_default_version'});
-        return({ json => {'success' => 1} }) if $rc == 0;
-        return({ json => {'success' => 0, 'error' => $out } });
+        my $job = Thruk::NodeControl::Utils::omd_update($c, $peer, $config->{'omd_default_version'});
+        return({ json => {'success' => 1} }) if $job;
+        return({ json => {'success' => 0, 'error' => "failed to start job" } });
     }
 
     return;
