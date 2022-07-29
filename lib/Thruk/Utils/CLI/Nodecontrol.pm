@@ -33,7 +33,9 @@ The nodecontrol command can start node control commands.
 
 use warnings;
 use strict;
+use Getopt::Long ();
 
+use Thruk::Utils ();
 use Thruk::Utils::CLI ();
 use Thruk::Utils::Log qw/:all/;
 
@@ -131,6 +133,7 @@ sub scale_peers {
         worker => $sub,
         collect => sub {},
     );
+    return;
 }
 
 ##############################################

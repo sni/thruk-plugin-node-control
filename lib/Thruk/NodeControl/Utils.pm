@@ -202,7 +202,7 @@ sub _runtime_data {
     if(!$skip_cpu) {
         my(undef, $omd_cpu) = _remote_cmd($c, $peer, ['top -bn2 | grep Cpu | tail -n 1']);
         if($omd_cpu =~ m/Cpu/gmx) {
-            my @val = split/\s+/, $omd_cpu;
+            my @val = split/\s+/mx, $omd_cpu;
             $runtime->{'omd_cpu_perc'}  = (100-$val[7])/100;
         }
     }
@@ -230,12 +230,12 @@ sub _ansible_available_packages {
     my @pkgs = ($pkgs =~ m/^(omd\-\S+?)(?:\s|\.x86_64)/gmx);
     @pkgs = grep(!/^(omd-labs-edition|omd-daily)/mx, @pkgs); # remove meta packages
     @pkgs = reverse sort @pkgs;
-    @pkgs = map { $_ =~ s/^omd\-//gmx; $_; } @pkgs;
+    @pkgs = map { my $pkg = $_; $pkg =~ s/^omd\-//gmx; $pkg; } @pkgs;
 
     # get installed omd versions
     my $installed;
     (undef, $installed) = _remote_cmd($c, $peer, ['omd versions']);
-    my @inst = split/\n/, $installed;
+    my @inst = split/\n/mx, $installed;
     my $default;
     for my $i (@inst) {
         if($i =~ m/\Q(default)\E/mx) {
@@ -248,9 +248,9 @@ sub _ansible_available_packages {
     my %in_use;
     my $sites;
     (undef, $sites) = _remote_cmd($c, $peer, ['omd sites']);
-    my @sites = split/\n/, $sites;
+    my @sites = split/\n/mx, $sites;
     for my $s (@sites) {
-        my($name, $version, $comment) = split/\s+/, $s;
+        my($name, $version, $comment) = split/\s+/mx, $s;
         $omd_sites{$name} = $version;
         $in_use{$version} = 1;
     }
