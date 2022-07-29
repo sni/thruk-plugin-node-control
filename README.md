@@ -2,6 +2,14 @@
 
 This plugin allows you to control nodes (OMD / OS) from within Thruk.
 
+## Features
+
+  - OMD installation
+  - OMD site updates
+  - OMD cleanup old unused versions
+  - OMD services start/stop
+  - OS Updates
+
 ## Installation
 
 This plugin requires OMD (https://labs.consol.de/omd/).
