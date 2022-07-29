@@ -130,6 +130,10 @@ update runtime data and return facts
 =cut
 sub update_runtime_data {
     my($c, $peer, $skip_cpu) = @_;
+
+    my $f = ansible_get_facts($c, $peer, 0);
+    return($f) unless defined $f->{'ansible_facts'}; # update only if we at least fetched facts once
+
     Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
     my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => $$ }, { pretty => 1, allow_empty => 1 });
@@ -137,7 +141,6 @@ sub update_runtime_data {
     eval {
         $runtime = _runtime_data($c, $peer, $skip_cpu);
     };
-    my $f;
     my $err = $@;
     if($err) {
         $f = Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => 0, 'last_error' => $err }, { pretty => 1, allow_empty => 1 });

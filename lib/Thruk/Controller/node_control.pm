@@ -66,7 +66,7 @@ sub index {
         push @{$servers}, Thruk::NodeControl::Utils::get_server($c, $peer);
     }
 
-    if(!$config->{'omd_default_version'}) {
+    if(!$config->{'omd_default_version'} && $servers->[0]->{omd_version}) {
         Thruk::NodeControl::Utils::save_config($c, {
             'omd_default_version'   => $servers->[0]->{omd_version},
         });
