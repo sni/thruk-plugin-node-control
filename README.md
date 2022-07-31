@@ -30,3 +30,6 @@ manager.
  - Centos: `siteuser  ALL=(ALL) NOPASSWD: /usr/bin/omd, NOPASSWD: /usr/bin/dnf`
 
 (replace siteuser with the actual site user name)
+
+Optional ssh login helps starting services if http connection does not work, for
+ex. because the site is stopped.

@@ -65,7 +65,7 @@ return server details
 =cut
 sub get_server {
     my($c, $peer, $config) = @_;
-    my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 0);
+    my $facts = ansible_get_facts($c, $peer, 0);
     $config = $config || config($c);
 
     # check if jobs are still running
@@ -389,10 +389,6 @@ sub omd_update {
         return;
     }
 
-    # TODO: run gather facts after complete
-    # TODO: add options to install defaults on update
-    # TODO: try to start in tmux
-
     Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
@@ -437,15 +433,16 @@ sub _remote_cmd {
     };
     my $err = $@;
     if($err) {
-        _warn("remote cmd failed: %s", $err);
         # fallback to ssh if possible
-        my $facts     = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 0);
+        my $facts     = ansible_get_facts($c, $peer, 0);
         my $host_name = $facts->{'ansible_facts'}->{'ansible_fqdn'};
         if($host_name && !$background) {
+            _debug("remote cmd failed: %s", $err);
+            _debug("fallback to ssh");
             ($rc, $out) = Thruk::Utils::IO::cmd($c, "ansible all -i $host_name, -m shell -a \"".$cmd."\"");
-            if($rc != 0) {
-                die($out);
-            }
+            die($out) if $out =~ m/^.*?\s+\|\s+UNREACHABLE\s+\|\s+rc=\d\s+>>/mx;
+            $out =~ s/^.*?\s+\|\s+.*?\s+\|\s+rc=\d\s+>>//gmx;
+            return($rc, $out);
         } else {
             die($err);
         }
