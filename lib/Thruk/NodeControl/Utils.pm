@@ -4,7 +4,9 @@ use warnings;
 use strict;
 use Cpanel::JSON::XS ();
 
+use Thruk::Base ();
 use Thruk::Constants qw/:peer_states/;
+use Thruk::Utils::External ();
 use Thruk::Utils::IO ();
 use Thruk::Utils::Log qw/:all/;
 
@@ -79,8 +81,15 @@ sub get_server {
         my $job = $facts->{$key};
         next unless $job;
         next if $job eq "1"; # starting right now
-        my $data = $peer->job_data($c, $job);
-        if(!$data->{'is_running'}) {
+        my $data;
+        eval {
+            $data = $peer->job_data($c, $job);
+        };
+        if($@) {
+            _warn($@);
+            next;
+        }
+        if($data && !$data->{'is_running'}) {
             $facts->{$key} = 0;
             if($data->{'rc'} != 0) {
                 $facts->{'last_error'} = $data->{'stdout'}.$data->{'stderr'};
@@ -382,7 +391,11 @@ sub omd_update {
 
     my($rc, $job);
     eval {
-        ($rc, $job) = _remote_cmd($c, $peer, 'omd stop; omd -V '.$version.' update; omd start', 1);
+        my $root = Thruk::Base::dirname(__FILE__);
+        my $script = Thruk::Utils::IO::read($root."/../../../scripts/omd_update.sh");
+        $peer->rpc($c, 'Thruk::Utils::IO::write', '/tmp/test.sh', $script);
+
+        ($rc, $job) = _remote_cmd($c, $peer, 'OMD_UPDATE="'.$version.'" bash /tmp/test.sh', 1);
     };
     if($@) {
         $f = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
@@ -440,7 +453,7 @@ sub _remote_cmd {
             _debug("remote cmd failed: %s", $err);
             _debug("fallback to ssh");
             ($rc, $out) = Thruk::Utils::IO::cmd($c, "ansible all -i $host_name, -m shell -a \"".$cmd."\"");
-            die($out) if $out =~ m/^.*?\s+\|\s+UNREACHABLE\s+\|\s+rc=\d\s+>>/mx;
+            die($out) if $out =~ m/^.*?\s+\|\s+UNREACHABLE.*?=>/mx;
             $out =~ s/^.*?\s+\|\s+.*?\s+\|\s+rc=\d\s+>>//gmx;
             return($rc, $out);
         } else {
