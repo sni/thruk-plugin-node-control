@@ -69,7 +69,8 @@ sub get_server {
     $config = $config || config($c);
 
     # check if jobs are still running
-    my $save_required = 0;
+    my $save_required    = 0;
+    my $refresh_required = 0;
     if($facts->{'gathering'} && !kill(0, $facts->{'gathering'})) {
         $save_required = 1;
         $facts->{'gathering'} = 0;
@@ -84,13 +85,22 @@ sub get_server {
             if($data->{'rc'} != 0) {
                 $facts->{'last_error'} = $data->{'stdout'}.$data->{'stderr'};
             }
+            $facts->{'last_job'} = $job;
             $save_required = 1;
+            $refresh_required = 1;
         }
     }
     if($save_required) {
         Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
         my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
         Thruk::Utils::IO::json_lock_store($file, $facts, { pretty => 1 });
+    }
+    if($refresh_required) {
+        Thruk::Utils::External::perl($c, {
+            'expr'       => 'Thruk::NodeControl::Utils::ansible_get_facts($c, "'.$peer->{'key'}.'", 1);',
+            'background' => 1,
+        });
+        $facts->{'gathering'} = 1;
     }
 
     $facts->{'last_error'} =~ s/\s+at\s+.*HTTP\.pm\s+line\s+\d+\.//gmx if $facts->{'last_error'};
@@ -118,6 +128,7 @@ sub get_server {
         omd_disk_free           => $facts->{'omd_disk_free'} // '',
         omd_available_versions  => $facts->{'omd_packages_available'} // [],
         last_error              => $facts->{'last_error'} // '',
+        last_job                => $facts->{'last_job'} // '',
         facts                   => $facts || {},
     };
 
@@ -141,6 +152,9 @@ return ansible gather facts
 =cut
 sub ansible_get_facts {
     my($c, $peer, $refresh) = @_;
+    if(!ref $peer) {
+        $peer = $c->db->get_peer_by_key($peer);
+    }
     Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
     my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     my $f;
@@ -195,7 +209,7 @@ sub _ansible_get_facts {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => $$ }, { pretty => 1, allow_empty => 1 });
+    my $prev = Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => $$ }, { pretty => 1, allow_empty => 1 });
 
     # available subsets are listed here:
     # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/setup_module.html#parameter-gather_subset
@@ -205,7 +219,7 @@ sub _ansible_get_facts {
     my $pkgs    = _ansible_available_packages($c, $peer, $f);
 
     # merge hashes
-    $f = {%{$f//{}}, %{$runtime//{}}, %{$pkgs//{}}};
+    $f = { %{$prev//{}}, %{$f//{}}, %{$runtime//{}}, %{$pkgs//{}}};
 
     Thruk::Utils::IO::json_lock_store($file, $f, { pretty => 1 });
     return($f);
@@ -342,7 +356,7 @@ sub omd_install {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'installing' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    Thruk::Utils::IO::json_lock_patch($file, { 'installing' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
 
@@ -358,9 +372,27 @@ update site to given version on peer
 sub omd_update {
     my($c, $peer, $version) = @_;
 
-    # TODO: ...
+    my $facts = _ansible_get_facts($c, $peer, 0);
+    return if $facts->{'updating'};
 
-    return;
+    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $f = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+
+    my($rc, $job);
+    eval {
+        ($rc, $job) = _remote_cmd($c, $peer, 'omd stop; omd -V '.$version.' update; omd start', 1);
+    };
+    if($@) {
+        $f = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+        return;
+    }
+
+    # TODO: run gather facts after complete
+    # TODO: add options to install defaults on update
+    # TODO: try to start in tmux
+
+    Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    return($job);
 }
 
 ##########################################################
@@ -390,7 +422,7 @@ sub omd_cleanup {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
 
