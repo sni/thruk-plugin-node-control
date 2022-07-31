@@ -210,6 +210,8 @@ sub _ansible_get_facts {
     }
 
     my $prev = Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => $$ }, { pretty => 1, allow_empty => 1 });
+    $prev->{'gathering'}  = 0;
+    $prev->{'last_error'} = "";
 
     # available subsets are listed here:
     # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/setup_module.html#parameter-gather_subset
