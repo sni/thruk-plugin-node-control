@@ -152,7 +152,7 @@
 
                   [% has_installed = 0 %]
                   [% IF s.installing %]
-                    <div class="spinner clickable" style="margin-right: 3px;" title="site is installing omd right now" onclick="showJobOutputPopup('[% s.installing | html %]','[% s.peer_key | html %]', 'Install OMD [% omd_default_version | html %] on [% s.host_name | html %]')"></div>
+                    <div class="spinner clickable" style="margin-right: 3px;" title="site is installing omd right now" onclick="showJobOutputPopup('[% s.installing | html %]','[% s.peer_key | html %]')"></div>
                   [% ELSE %]
                     [% FOREACH ver = s.omd_versions %]
                       [% IF ver == omd_default_version; has_installed = 1; LAST; END %]
@@ -161,13 +161,13 @@
                   [% END %]
 
                   [% IF s.updating %]
-                    <div class="spinner clickable" style="margin-right: 3px;" title="site is updating omd right now" onclick="showJobOutputPopup('[% s.updating | html %]','[% s.peer_key | html %]', 'Update site to [% omd_default_version | html %] on [% s.host_name | html %]')"></div>
+                    <div class="spinner clickable" style="margin-right: 3px;" title="site is updating omd right now" onclick="showJobOutputPopup('[% s.updating | html %]','[% s.peer_key | html %]')"></div>
                   [% ELSE %]
                     <a href="#" class="js-omd-update-btn [% IF s.omd_version == omd_default_version || !has_installed %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_update'}, true)"><i class="fa-solid fa-square-up-right text-sm" title='Update to omd-[% omd_default_version | html %]'></i></a>
                   [% END %]
 
                   [% IF s.cleaning %]
-                    <div class="spinner clickable" style="margin-right: 3px;" title="site is cleaning up right now" onclick="showJobOutputPopup('[% s.cleaning | html %]','[% s.peer_key | html %]', 'OMD cleanup on [% s.host_name | html %]')"></div>
+                    <div class="spinner clickable" style="margin-right: 3px;" title="site is cleaning up right now" onclick="showJobOutputPopup('[% s.cleaning | html %]','[% s.peer_key | html %]')"></div>
                   [% ELSE %]
                     <a href="#" class="js-cleanup-btn [% IF s.omd_cleanable.size == 0 %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'cleanup'}, true)"><i class="fa-solid fa-broom text-sm" title='Run omd cleanup to remove:&#013;[% s.omd_cleanable.join("&#013;") %]'></i></a>
                   [% END %]

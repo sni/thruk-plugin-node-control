@@ -351,11 +351,11 @@ sub omd_install {
     my($rc, $job);
     eval {
         if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum install -y '.$version, 1);
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum install -y '.$version, { message => 'Installing OMD '.$version });
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf install -y '.$version, 1);
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf install -y '.$version, { message => 'Installing OMD '.$version });
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n apt-get install -y '.$version, 1);
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n apt-get install -y '.$version, { message => 'Installing OMD '.$version });
         } else {
             die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
         }
@@ -393,9 +393,9 @@ sub omd_update {
     eval {
         my $root = Thruk::Base::dirname(__FILE__);
         my $script = Thruk::Utils::IO::read($root."/../../../scripts/omd_update.sh");
-        $peer->rpc($c, 'Thruk::Utils::IO::write', '/tmp/test.sh', $script);
+        $peer->rpc($c, 'Thruk::Utils::IO::write', 'var/tmp/omd_update.sh', $script);
 
-        ($rc, $job) = _remote_cmd($c, $peer, 'OMD_UPDATE="'.$version.'" bash /tmp/test.sh', 1);
+        ($rc, $job) = _remote_cmd($c, $peer, 'OMD_UPDATE="'.$version.'" bash var/tmp/omd_update.sh', { message => 'Updating Site To '.$version });
     };
     if($@) {
         $f = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
@@ -426,7 +426,7 @@ sub omd_cleanup {
 
     my($rc, $job);
     eval {
-        ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n omd cleanup', 1);
+        ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n omd cleanup', { message => 'Running OMD cleanup' });
     };
     if($@) {
         $f = Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
@@ -439,17 +439,17 @@ sub omd_cleanup {
 
 ##########################################################
 sub _remote_cmd {
-    my($c, $peer, $cmd, $background) = @_;
+    my($c, $peer, $cmd, $background_options) = @_;
     my($rc, $out);
     eval {
-        ($rc, $out) = $peer->cmd($c, $cmd, $background);
+        ($rc, $out) = $peer->cmd($c, $cmd, $background_options);
     };
     my $err = $@;
     if($err) {
         # fallback to ssh if possible
         my $facts     = ansible_get_facts($c, $peer, 0);
         my $host_name = $facts->{'ansible_facts'}->{'ansible_fqdn'};
-        if($host_name && !$background) {
+        if($host_name && !$background_options) {
             _debug("remote cmd failed: %s", $err);
             _debug("fallback to ssh");
             ($rc, $out) = Thruk::Utils::IO::cmd($c, "ansible all -i $host_name, -m shell -a \"".$cmd."\"");

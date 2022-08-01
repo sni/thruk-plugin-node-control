@@ -1,32 +1,62 @@
 #!/bin/bash
 
 if [ "$OMD_UPDATE" = "" ]; then
-    echo "script requires OMD_VERSION env variable"
+    echo "script requires OMD_UPDATE env variable"
     exit 1
 fi
-echo "updating to version $OMD_UPDATE..."
+
+echo "[$(date)] updating site $(id -un) from $(omd version -b) to version $OMD_UPDATE..."
 
 omd stop
+# make sure it is stopped
+omd status -b > /dev/null 2>&1
+if [ $? -ne 1 ]; then
+    omd stop
+fi
+
+CMD="omd -f -V $OMD_UPDATE update --conflict=ask"
 
 # start update in tmux
 if command -v tmux >/dev/null 2>&1; then
     session="omd_update"
-    tmux new-session -d -s $session
+    tmux new-session -d -s $session -x 120 -y 25
     window=0
     tmux rename-window -t $session:$window 'omd_update'
-    tmux send-keys -t $session:$window 'omd -V $OMD_UPDATE update' C-m
+    tmux send-keys -t $session:$window "$CMD" C-m
+    sleep 2
 
     # now wait till the omd update is finished and tail the output till then
     # end tmux on success
     bashpid=$(tmux list-panes -a -F "#{pane_pid} #{session_name}" | grep $session | awk '{ print $1 }')
-
-    while kill -0 $bashpid; do
-        tmux capture-pane -p -s $session
-        sleep 5
+    omdpid=$(ps -efl | grep $bashpid | grep omd | awk '{ print $4 }')
+    X=0
+    while [ $X -lt 10 ]; do
+        omdpid=$(ps -efl | grep $bashpid | grep omd | awk '{ print $4 }')
+        sleep 1
+        X=$((X+1))
     done
 
+    X=0
+    while kill -0 $omdpid >/dev/null 2>&1; do
+        sleep 1
+        X=$((X+1))
+        if [ $X -gt 120 ]; then
+            echo "update failed, ssh into $HOSTNAME and run 'tmux attach -t $session:$window' to manually investigate"
+            exit 1
+        fi
+    done
+    tmux capture-pane -p -t $session:$window
 else
-    omd -f -V $OMD_UPDATE update
+    $CMD
 fi
 
-omd start
+if [ "$(omd version -b)" = "$OMD_UPDATE" ]; then
+    omd start
+    echo "[$(date)] update finished: $(omd version -b)"
+    # exit tmux again
+    tmux send-keys -t $session:$window "exit" C-m
+    exit 0
+fi
+
+echo "update failed, ssh into $HOSTNAME and run 'tmux attach -t $session:$window' to manually investigate"
+exit 1

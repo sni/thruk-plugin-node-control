@@ -1,3 +1,13 @@
+var ms_row_refresh_interval = 3000;
+var ms_refresh_timer;
+// add background refresh for all rows currently spinning
+jQuery(document).ready(function() {
+    window.clearTimeout(ms_refresh_timer);
+    ms_refresh_timer = window.setTimeout(function() {
+        refresh_all_changed_rows();
+    }, ms_row_refresh_interval)
+});
+
 // used for updating all (visible) servers
 function nc_run_all(mainBtn, cls, extraData) {
     setBtnSpinner(mainBtn, true);
@@ -26,14 +36,7 @@ function nc_run_all(mainBtn, cls, extraData) {
             setBtnNoSpinner(btn);
             startNext();
 
-            // update table row
-            var tr = jQuery(btn).parents('TR')[0];
-            jQuery.get('node_control.cgi', {}, function(data, textStatus, jqXHR) {
-                var table = jQuery(btn).parents('TABLE')[0];
-                var newRow = jQuery(data).find('#'+tr.id);
-                jQuery('#'+tr.id).replaceWith(newRow);
-                applyRowStripes(table);
-            });
+            refresh_all_changed_rows_now();
         }, extraData);
     }
     var parallel = jQuery("INPUT[name='parallel']").val();
@@ -42,17 +45,37 @@ function nc_run_all(mainBtn, cls, extraData) {
     }
 }
 
-function refresh_node_row(peer_id) {
-    // update table row
-    var tr = document.getElementById("node_row_"+peer_id);
-    jQuery.get('node_control.cgi', {}, function(data, textStatus, jqXHR) {
-        var table = jQuery(tr).parents('TABLE')[0];
-        var newRow = jQuery(data).find('#'+tr.id);
-        jQuery('#'+tr.id).replaceWith(newRow);
-        applyRowStripes(table);
-    });
+function refresh_all_changed_rows_now() {
+    window.clearTimeout(ms_refresh_timer);
+    ms_refresh_timer = window.setTimeout(function() {
+        refresh_all_changed_rows();
+    }, 200)
 }
 
+function refresh_all_changed_rows() {
+    window.clearTimeout(ms_refresh_timer);
+    ms_refresh_timer = null;
+    var rows = jQuery("DIV.spinner").parents("TR");
+    if(rows.length == 0) {
+        ms_refresh_timer = window.setTimeout(function() {
+            refresh_all_changed_rows();
+        }, ms_row_refresh_interval)
+        return;
+    }
+    jQuery.get('node_control.cgi', {}, function(data, textStatus, jqXHR) {
+        var table = jQuery(rows[0]).parents('TABLE')[0];
+        jQuery(rows).each(function(i, el) {
+            if(el.id) {
+                var newRow = jQuery(data).find('#'+el.id);
+                jQuery('#'+el.id).replaceWith(newRow);
+            }
+        });
+        applyRowStripes(table);
+        ms_refresh_timer = window.setTimeout(function() {
+            ms_refresh_timer = refresh_all_changed_rows();
+        }, ms_row_refresh_interval)
+    });
+}
 
 // used to update service status
 function nc_omd_service(btn, extraData) {
@@ -63,12 +86,6 @@ function nc_omd_service(btn, extraData) {
         setBtnNoSpinner(btn);
 
         // update table row
-        var tr = jQuery(btn).parents('TR')[0];
-        jQuery.get('node_control.cgi?action=omd_status&modal=1&peer='+extraData.peer, {}, function(data, textStatus, jqXHR) {
-            var table = jQuery(btn).parents('TABLE')[0];
-            var newRow = jQuery(data).find('#'+tr.id);
-            jQuery('#'+tr.id).replaceWith(newRow);
-            refresh_node_row(extraData.peer);
-        });
+        refresh_all_changed_rows_now();
     }, extraData);
 }
