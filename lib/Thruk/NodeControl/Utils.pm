@@ -355,7 +355,7 @@ sub omd_install {
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
             ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf install -y '.$version, { message => 'Installing OMD '.$version });
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n apt-get install -y '.$version, { message => 'Installing OMD '.$version });
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n DEBIAN_FRONTEND=noninteractive apt-get install -y '.$version, { message => 'Installing OMD '.$version });
         } else {
             die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
         }
