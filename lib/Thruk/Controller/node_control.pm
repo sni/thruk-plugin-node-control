@@ -36,6 +36,7 @@ sub index {
     $c->stash->{title}                 = 'Node Control';
     $c->stash->{template}              = 'node_control.tt';
     $c->stash->{infoBoxTitle}          = 'Node Control';
+    $c->stash->{plugin_name}           = Thruk::Utils::get_plugin_name(__FILE__, __PACKAGE__);
 
     my $config               = Thruk::NodeControl::Utils::config($c);
     my $parallel_actions     = $config->{'parallel_tasks'} // 3;

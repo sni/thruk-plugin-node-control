@@ -26,10 +26,23 @@ You now have a new menu item under System -> Node Control.
 The controlled sites need to have sudo permissions for omd and their package
 manager.
 
- - Debian: `siteuser  ALL=(ALL) NOPASSWD: /usr/bin/omd, NOPASSWD: /usr/bin/apt-get`
+ - Debian: `siteuser  ALL=(ALL) NOPASSWD: /usr/bin/omd, NOPASSWD:SETENV: /usr/bin/apt-get`
  - Centos: `siteuser  ALL=(ALL) NOPASSWD: /usr/bin/omd, NOPASSWD: /usr/bin/dnf`
 
 (replace siteuser with the actual site user name)
 
 Optional ssh login helps starting services if http connection does not work, for
 ex. because the site is stopped.
+
+## Configuration
+
+```
+  <Component Thruk::Plugin::NodeControl>
+    #hook_update_pre  = if [ $(git status --porcelain 2>&1 | wc -l) -gt 0 ]; then echo "omd home not clean"; git status --porcelain 2>&1; exit 1; fi
+    #hook_update_post = git add . && git commit -a -m "update to omd $(omd version -b)"
+  </Component>
+```
+
+Configure hooks to automatically checkin the version update into git. Requires
+git and the omd site in a git repository.
+

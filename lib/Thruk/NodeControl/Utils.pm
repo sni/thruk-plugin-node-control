@@ -180,7 +180,7 @@ sub ansible_get_facts {
 
 =head2 update_runtime_data
 
-  update_runtime_data($c, $peer)
+  update_runtime_data($c, $peer, [$skip_cpu])
 
 update runtime data and return facts
 
@@ -355,7 +355,7 @@ sub omd_install {
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
             ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf install -y '.$version, { message => 'Installing OMD '.$version });
         } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n DEBIAN_FRONTEND=noninteractive apt-get install -y '.$version, { message => 'Installing OMD '.$version });
+            ($rc, $job) = _remote_cmd($c, $peer, 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get install -y '.$version, { message => 'Installing OMD '.$version });
         } else {
             die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
         }
@@ -386,23 +386,73 @@ sub omd_update {
     my $facts = _ansible_get_facts($c, $peer, 0);
     return if $facts->{'updating'};
 
-    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
-    my $f = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+    my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+    my $config = config($c);
+
+    if($config->{'hook_update_pre'}) {
+        my($rc, $out) = _remote_cmd($c, $peer, $config->{'hook_update_pre'});
+        if($rc != 0) {
+            Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 0, 'last_error' => "update canceled by pre hook: ".$out }, { pretty => 1, allow_empty => 1 });
+            return;
+        }
+    }
+
+    # continue in background job
+    my $job = Thruk::Utils::External::perl($c, {
+        expr       => 'Thruk::NodeControl::Utils::_omd_update_step2($c, "'.$peer->{'key'}.'", "'.$version.'")',
+        background => 1,
+    });
+    return($job);
+}
+
+##########################################################
+sub _omd_update_step2 {
+    my($c, $peerkey, $version) = @_;
+    my $peer   = $c->db->get_peer_by_key($peerkey);
+    my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $config = config($c);
 
     my($rc, $job);
     eval {
-        my $root = Thruk::Base::dirname(__FILE__);
+        my $root   = Thruk::Base::dirname(__FILE__);
         my $script = Thruk::Utils::IO::read($root."/../../../scripts/omd_update.sh");
         $peer->rpc($c, 'Thruk::Utils::IO::write', 'var/tmp/omd_update.sh', $script);
 
         ($rc, $job) = _remote_cmd($c, $peer, 'OMD_UPDATE="'.$version.'" bash var/tmp/omd_update.sh', { message => 'Updating Site To '.$version });
     };
     if($@) {
-        $f = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+        Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
         return;
     }
 
     Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+
+    # wait for 60 sec
+    my $end = time() + 60;
+    my $jobdata;
+    while(time() < $end) {
+        eval {
+            $jobdata = $peer->job_data($c, $job);
+        };
+        if($jobdata && !$jobdata->{'is_running'}) {
+            last;
+        }
+        sleep(3);
+    }
+
+    if($jobdata && !$jobdata->{'is_running'}) {
+        if($config->{'hook_update_post'}) {
+            my($rc, $out) = _remote_cmd($c, $peer, $config->{'hook_update_post'}, { message => 'Post Update Hook'});
+            if($rc != 0) {
+                Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 0, 'last_error' => "update canceled by pre hook: $out" }, { pretty => 1, allow_empty => 1 });
+                return;
+            }
+        }
+    }
+
+    update_runtime_data($c, $peer, 1);
+
     return($job);
 }
 
@@ -541,6 +591,21 @@ sub save_config {
     my($c, $newconf) = @_;
     my $conf = {%{config($c)}, %{$newconf//{}}};
     my $file = $c->config->{'var_path'}.'/node_control/_conf.json';
+
+    my $allowed_keys = {
+        'parallel_tasks'        => 1,
+        'omd_default_version'   => 1,
+    };
+
+    for my $key (sort keys %{$newconf}) {
+        confess('config option '.$key.' not storable in var/') unless $allowed_keys->{$key};
+    }
+
+    # remove all keys except those which store a override in var/
+    for my $key (sort keys %{$conf}) {
+        delete $conf->{$key} unless $allowed_keys->{$key};
+    }
+
     Thruk::Utils::IO::json_lock_store($file, $conf);
     return;
 }
