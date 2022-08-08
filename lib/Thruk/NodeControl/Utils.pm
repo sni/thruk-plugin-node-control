@@ -354,9 +354,23 @@ sub _ansible_available_os_updates {
     }
 
     if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
-        my($rc, $out) = _remote_cmd($c, $peer, 'dnf check-update');
-        my($rc, $out) = _remote_cmd($c, $peer, 'dnf check-update --security');
+        my($rc, $out) = _remote_cmd($c, $peer, 'dnf check-update 2>/dev/null');
+        $updates = _parse_yum_check_update($out);
+
+        ($rc, $out) = _remote_cmd($c, $peer, 'dnf check-update --security 2>/dev/null');
+        $security = _parse_yum_check_update($out);
     }
+
+    if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
+        my($rc, $out) = _remote_cmd($c, $peer, 'yum check-update 2>/dev/null');
+        $updates = _parse_yum_check_update($out);
+
+        ($rc, $out) = _remote_cmd($c, $peer, 'yum check-update --security 2>/dev/null');
+        $security = _parse_yum_check_update($out);
+    }
+
+    @{$updates}  = sort @{$updates};
+    @{$security} = sort @{$security};
 
     return({ os_updates => $updates, os_security => $security });
 }
@@ -655,6 +669,15 @@ sub _machine_type {
         return($facts->{'ansible_facts'}->{'ansible_virtualization_type'});
     }
     return;
+}
+
+##########################################################
+sub _parse_yum_check_update {
+    my($out) = @_;
+    $out =~ s/^\s*$//gmx;
+    my @pkgs = $out =~ /^(\S+)\s+\S+\s+\w+$/gmx;
+    @pkgs = map { my $p = $_; $p =~ s/(\.noarch|\.x86_64)$//gmx; $p; } @pkgs;
+    return(\@pkgs);
 }
 
 ##########################################################
