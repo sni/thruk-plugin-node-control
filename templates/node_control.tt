@@ -113,7 +113,23 @@
                 [% END %]
               [% END %]
             </td>
-            <td class="align-top clickable" onclick="openModalWindowUrl('node_control.cgi?action=facts&modal=1&peer=[% s.peer_key | html %]');">[% s.os_name | html %] [% s.os_version | html %]</td>
+            <td class="align-top">
+              <div class="flexrow flex-nowrap gap-x-1 justify-between">
+                <span class="clickable" onclick="openModalWindowUrl('node_control.cgi?action=facts&modal=1&peer=[% s.peer_key | html %]');">[% s.os_name | html %] [% s.os_version | html %]</span>
+                <div class="flexrow flex-nowrap gap-x-1">
+                  [% IF s.os_updates.size > 0 %]
+                    <button class="round h-5 w-5 gray text-xs text-center" title="There are [% s.os_updates.size %] updates available: [% s.os_updates.join(", ").substr(0, 250) %]">
+                      [% s.os_updates.size %]
+                    </button>
+                  [% END %]
+                  [% IF s.os_security.size > 0 %]
+                    <button class="round h-5 w-5 red text-xs text-center" title="There are [% s.os_security.size %] security updates available: [% s.os_security.join(", ").substr(0, 250) %]">
+                      [% s.os_security.size %]
+                    </button>
+                  [% END %]
+                </div>
+              </div>
+            </td>
             <td>[% s.machine_type %]</td>
             <td class='align-top relative'>
               [% IF s.cpu_perc; %][%IF s.cpu_perc > 1; s.cpu_perc = 1; END %]

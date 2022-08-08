@@ -6,7 +6,7 @@
 [% END %]
 
 <script src="[% url_prefix %]vendor/linedtextarea-e619e09/jquery-linedtextarea.js" type="text/javascript" charset="utf-8"></script>
-<div class="card w-full min-w-[1200px] min-h-[500px] [% IF modal %] shadow-float[% END %] flexcol flex-nowrap gap-0">
+<div class="card w-full [% IF modal %] shadow-float[% END %] flexcol flex-nowrap gap-0" style="min-width: 1200px; min-height: 500px;">
   <div class="head justify-between">
     <h3>Node Facts: [% s.host_name | html %]</h3>
     [% IF modal %]

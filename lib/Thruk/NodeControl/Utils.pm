@@ -128,6 +128,8 @@ sub get_server {
         omd_status              => $facts->{'omd_status'} // {},
         os_name                 => $facts->{'ansible_facts'}->{'ansible_distribution'} // '',
         os_version              => $facts->{'ansible_facts'}->{'ansible_distribution_version'} // '',
+        os_updates              => $facts->{'os_updates'} // [],
+        os_security             => $facts->{'os_security'} // [],
         machine_type            => _machine_type($facts) // '',
         cpu_cores               => $facts->{'ansible_facts'}->{'ansible_processor_vcpus'} // '',
         cpu_perc                => $facts->{'omd_cpu_perc'} // '',
@@ -228,9 +230,10 @@ sub _ansible_get_facts {
     my $f       = _ansible_adhoc_cmd($c, $peer, "-m setup -a 'gather_subset=hardware,virtual gather_timeout=30'");
     my $runtime = _runtime_data($c, $peer);
     my $pkgs    = _ansible_available_packages($c, $peer, $f);
+    my $updates = _ansible_available_os_updates($c, $peer, $f);
 
     # merge hashes
-    $f = { %{$prev//{}}, %{$f//{}}, %{$runtime//{}}, %{$pkgs//{}}};
+    $f = { %{$prev//{}}, %{$f//{}}, %{$runtime//{}}, %{$pkgs//{}}, %{$updates//{}}};
 
     Thruk::Utils::IO::json_lock_store($file, $f, { pretty => 1 });
     return($f);
@@ -322,6 +325,40 @@ sub _ansible_available_packages {
     }
 
     return({ omd_packages_available => \@pkgs, omd_versions => \@inst, omd_cleanable => \@cleanable, omd_sites => \%omd_sites });
+}
+
+##########################################################
+sub _ansible_available_os_updates {
+    my($c, $peer, $facts) = @_;
+
+    if(!$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}) {
+        die("no package manager");
+    }
+
+    my $updates  = [];
+    my $security = [];
+    if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
+        my($rc, $out) = _remote_cmd($c, $peer, 'apt-get -y --dry-run upgrade');
+        if($rc == 0) {
+            my @updates = $out =~ m/^Inst\s+(\S+)\s+(.*)$/gmx;
+            while(scalar @updates > 0) {
+                my $pkg = shift @updates;
+                my $src = shift @updates;
+                if($src =~ m/(Debian\-Security:|Ubuntu:[^\/]*\/[^-]*-security)/mx) {
+                    push @{$security}, $pkg;
+                } else {
+                    push @{$updates}, $pkg;
+                }
+            }
+        }
+    }
+
+    if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
+        my($rc, $out) = _remote_cmd($c, $peer, 'dnf check-update');
+        my($rc, $out) = _remote_cmd($c, $peer, 'dnf check-update --security');
+    }
+
+    return({ os_updates => $updates, os_security => $security });
 }
 
 ##########################################################
