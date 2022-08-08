@@ -130,15 +130,15 @@
                   <div class="flexrow flex-nowrap gap-x-1">
                     [% IF s.os_updating %]
                       <div class="spinner clickable" onclick="showJobOutputPopup('[% s.os_updating | html %]','[% s.peer_key | html %]'); return false;"></div>
-                    [% ELSIF !s.os_sec_updating %]
-                      <button class="round p-0 h-5 w-5 gray text-xs text-center [% IF s.os_updates.size == 0 %]invisible[% END %] js-os-update-btn" title="There are [% s.os_updates.size %] updates available: [% s.os_updates.join(", ").substr(0, 250) %]" onclick="return send_form_in_background_and_reload(this, {action: 'os_update'}, true)">
+                    [% ELSE %]
+                      <button class="round p-0 h-5 w-5 gray text-xs text-center [% IF s.os_updates.size == 0 || s.os_sec_updating %]invisible[% END %] js-os-update-btn" title="There are [% s.os_updates.size %] updates available: [% s.os_updates.join(", ").substr(0, 250) %]" onclick="return send_form_in_background_and_reload(this, {action: 'os_update'}, true)">
                         <i style="font-style: normal;">[% s.os_updates.size %]</i>
                       </button>
                     [% END %]
                     [% IF s.os_sec_updating %]
-                      <div class="spinner clickable" onclick="showJobOutputPopup('[% s.os_sec_updating | html %]','[% s.peer_key | html %]'); return false;"></div>
-                    [% ELSIF !s.os_updating %]
-                      <button class="round p-0 h-5 w-5 red text-xs text-center [% IF s.os_security.size == 0 %]invisible[% END %] js-os-sec-update-btn" title="There are [% s.os_security.size %] security updates available: [% s.os_security.join(", ").substr(0, 250) %]" onclick="return send_form_in_background_and_reload(this, {action: 'os_sec_update'}, true)">
+                      <div class="spinner clickable" style="margin-left: 3px;" onclick="showJobOutputPopup('[% s.os_sec_updating | html %]','[% s.peer_key | html %]'); return false;"></div>
+                    [% ELSE %]
+                      <button class="round p-0 h-5 w-5 red text-xs text-center [% IF s.os_security.size == 0 || s.os_updating %]invisible[% END %] js-os-sec-update-btn" title="There are [% s.os_security.size %] security updates available: [% s.os_security.join(", ").substr(0, 250) %]" onclick="return send_form_in_background_and_reload(this, {action: 'os_sec_update'}, true)">
                         <i style="font-style: normal;">[% s.os_security.size %]</i>
                       </button>
                     [% END %]
