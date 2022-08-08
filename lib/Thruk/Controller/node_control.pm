@@ -171,6 +171,20 @@ sub _node_action {
         return({ json => {'success' => 0, 'error' => "failed to start job" } });
     }
 
+    if($action eq 'os_update') {
+        return unless Thruk::Utils::check_csrf($c);
+        my $job = Thruk::NodeControl::Utils::os_update($c, $peer, $config->{'omd_default_version'});
+        return({ json => {'success' => 1} }) if $job;
+        return({ json => {'success' => 0, 'error' => "failed to start job" } });
+    }
+
+    if($action eq 'os_sec_update') {
+        return unless Thruk::Utils::check_csrf($c);
+        my $job = Thruk::NodeControl::Utils::os_sec_update($c, $peer, $config->{'omd_default_version'});
+        return({ json => {'success' => 1} }) if $job;
+        return({ json => {'success' => 0, 'error' => "failed to start job" } });
+    }
+
     return;
 }
 

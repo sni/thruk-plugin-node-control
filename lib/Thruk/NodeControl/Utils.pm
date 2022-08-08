@@ -77,7 +77,7 @@ sub get_server {
         $save_required = 1;
         $facts->{'gathering'} = 0;
     }
-    for my $key (qw/cleaning installing updating/) {
+    for my $key (qw/cleaning installing updating os_updating os_sec_updating/) {
         my $job = $facts->{$key};
         next unless $job;
         next if $job eq "1"; # starting right now
@@ -120,6 +120,8 @@ sub get_server {
         cleaning                => $facts->{'cleaning'} || 0,
         installing              => $facts->{'installing'} || 0,
         updating                => $facts->{'updating'} || 0,
+        os_updating             => $facts->{'os_updating'} || 0,
+        os_sec_updating         => $facts->{'os_sec_updating'} || 0,
         host_name               => $facts->{'ansible_facts'}->{'ansible_fqdn'} // $peer->{'name'},
         omd_version             => $facts->{'omd_version'} // '',
         omd_versions            => $facts->{'omd_versions'} // [],
@@ -504,6 +506,99 @@ sub _omd_update_step2 {
 
     update_runtime_data($c, $peer, 1);
 
+    return($job);
+}
+
+##########################################################
+
+=head2 os_update
+
+  os_update($c, $peer)
+
+update os packages
+
+=cut
+sub os_update {
+    my($c, $peer) = @_;
+
+    my $facts = _ansible_get_facts($c, $peer, 0);
+    return if $facts->{'os_updating'};
+
+    if(!$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}) {
+        die("no package manager");
+    }
+
+    my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'os_updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+    my $config = config($c);
+
+    my($rc, $job);
+    eval {
+        if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum upgrade -y', { message => 'Installing OS Updates' });
+        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf upgrade -y', { message => 'Installing OS Updates' });
+        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
+            ($rc, $job) = _remote_cmd($c, $peer, 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get upgrade -y ', { message => 'Installing OS Updates'});
+        } else {
+            die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
+        }
+
+        die("starting job failed") unless $job;
+    };
+    if($@) {
+        $f = Thruk::Utils::IO::json_lock_patch($file, { 'os_updating' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+        return;
+    }
+
+    Thruk::Utils::IO::json_lock_patch($file, { 'os_updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    return($job);
+}
+
+##########################################################
+
+=head2 os_sec_update
+
+  os_sec_update($c, $peer)
+
+update os security packages
+
+=cut
+sub os_sec_update {
+    my($c, $peer) = @_;
+
+    my $facts = _ansible_get_facts($c, $peer, 0);
+    return if $facts->{'os_sec_updating'};
+
+    if(!$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}) {
+        die("no package manager");
+    }
+
+    my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'os_sec_updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+    my $config = config($c);
+
+    my($rc, $job);
+    eval {
+        if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum upgrade -y --security', { message => 'Installing OS Updates' });
+        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
+            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf upgrade -y --security', { message => 'Installing OS Updates' });
+        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
+            # debian has no simple way of installing sec updates only
+            ($rc, $job) = _remote_cmd($c, $peer, 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get upgrade -y', { message => 'Installing OS Updates'});
+        } else {
+            die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
+        }
+
+        die("starting job failed") unless $job;
+    };
+    if($@) {
+        $f = Thruk::Utils::IO::json_lock_patch($file, { 'os_sec_updating' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+        return;
+    }
+
+    Thruk::Utils::IO::json_lock_patch($file, { 'os_sec_updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
 
