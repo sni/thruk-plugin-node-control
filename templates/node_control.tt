@@ -4,7 +4,7 @@
 <div class="flexrow justify-between gap-x-1">
   [% PROCESS _infobox.tt %]
 
-  <div class="card min-w-[400px]">
+  <div class="card" style="min-width: 400px;">
     <div class="head">
       <h3>Options</h3>
     </div>
@@ -43,13 +43,13 @@
   var ms_parallel = [% ms_parallel | html %];
 </script>
 
-<div class="card w-full mt-5 min-w-[800px]">
+<div class="card w-full mt-5" style="min-width: 800px;">
   <div class="head p-0 justify-between border-0">
     <div class="mx-2">
       [% PROCESS _table_search_field.tt ids=["msTable"] %]
     </div>
     <div class="grow"></div>
-    <span class="tabs active" id="tabs-managed_head">Nodes</span>
+    <span class="tabs active">Nodes</span>
     <div class="grow"></div>
     <div class="w-48"></div>
   </div>
@@ -87,7 +87,7 @@
       </thead>
       <tbody class="rowhover">
         [% FOREACH s = data %]
-          <tr class="js-tabs tabs-managed" id="node_row_[% s.peer_key | html %]">
+          <tr class="js-tabs" id="node_row_[% s.peer_key | html %]">
             <td class="align-top">[% IF s.section != "Default"; s.section | html; END %]</td>
             <td class="align-top"><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/"><i class="uil uil-external-link-alt text-xs"></i>[% s.host_name | html %]</a></td>
             <td class="align-top">
@@ -223,7 +223,7 @@
             <tr>
               <td></td>
               <td></td>
-              <td colspan="7" class="textALERT whitespace-pre max-w-md truncate overflow-hidden clickable" onclick="toggleElement(jQuery(this).find('SPAN')[0])">[% lines = s.last_error.split("\n"); lines.shift | html %]<br><span class="hidden">[% lines.join("\n") %]</span></td>
+              <td colspan="7" class="textALERT whitespace-pre truncate overflow-hidden clickable" style="max-width: 60vw;" onclick="toggleElement(jQuery(this).find('SPAN')[0])">[% lines = s.last_error.split("\n"); lines.shift | html %]<br><span class="hidden">[% lines.join("\n") %]</span></td>
             </tr>
           [% END %]
         [% END %]
