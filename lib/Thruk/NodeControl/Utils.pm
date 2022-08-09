@@ -148,7 +148,7 @@ sub get_server {
     # remove current default from cleanable
     if($server->{'omd_cleanable'}) {
         my $def = $config->{'omd_default_version'};
-        @{$server->{'omd_cleanable'}} = grep(!/$def/, @{$server->{'omd_cleanable'}}) if $def;
+        @{$server->{'omd_cleanable'}} = grep(!/$def/mx, @{$server->{'omd_cleanable'}}) if $def;
     }
 
     return($server);
@@ -417,7 +417,7 @@ sub omd_install {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'installing' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    Thruk::Utils::IO::json_lock_patch($file, { 'installing' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
 
@@ -476,7 +476,7 @@ sub _omd_update_step2 {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
 
     # wait for 60 sec
     my $end = time() + 60;
@@ -544,7 +544,7 @@ sub os_update {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'os_updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    Thruk::Utils::IO::json_lock_patch($file, { 'os_updating' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
 
@@ -586,7 +586,7 @@ sub os_sec_update {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'os_sec_updating' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    Thruk::Utils::IO::json_lock_patch($file, { 'os_sec_updating' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
 
@@ -619,7 +619,7 @@ sub omd_cleanup {
         return;
     }
 
-    Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => $job, 'last_job', => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
+    Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
     return($job);
 }
 
