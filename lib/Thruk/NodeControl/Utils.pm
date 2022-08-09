@@ -398,21 +398,18 @@ sub omd_install {
 
     return if $facts->{'installing'};
 
+    my $config = config($c);
+    if(!$config->{'cmd_'.$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}.'_pkg_install'}) {
+        die("package manager ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}." not supported");
+    }
+    my $cmd = _cmd_line($config->{'cmd_'.$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}.'_pkg_install'}, { '%PKG' => $version });
+
     my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     my $f = Thruk::Utils::IO::json_lock_patch($file, { 'installing' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
 
     my($rc, $job);
     eval {
-        if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum install -y '.$version, { message => 'Installing OMD '.$version });
-        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf install -y '.$version, { message => 'Installing OMD '.$version });
-        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get install -y '.$version, { message => 'Installing OMD '.$version });
-        } else {
-            die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
-        }
-
+        ($rc, $job) = _remote_cmd($c, $peer, $cmd, { message => 'Installing OMD '.$version });
         die("starting job failed") unless $job;
     };
     if($@) {
@@ -532,18 +529,14 @@ sub os_update {
     my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'os_updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
     my $config = config($c);
 
+    if(!$config->{'cmd_'.$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}.'_os_update'}) {
+        die("package manager ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}." not supported");
+    }
+    my $cmd = _cmd_line($config->{'cmd_'.$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}.'_os_update'});
+
     my($rc, $job);
     eval {
-        if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum upgrade -y', { message => 'Installing OS Updates' });
-        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf upgrade -y', { message => 'Installing OS Updates' });
-        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get upgrade -y ', { message => 'Installing OS Updates'});
-        } else {
-            die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
-        }
-
+        ($rc, $job) = _remote_cmd($c, $peer, $cmd, { message => 'Installing OS Updates' });
         die("starting job failed") unless $job;
     };
     if($@) {
@@ -578,19 +571,14 @@ sub os_sec_update {
     my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'os_sec_updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
     my $config = config($c);
 
+    if(!$config->{'cmd_'.$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}.'_os_sec_update'}) {
+        die("package manager ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}." not supported");
+    }
+    my $cmd = _cmd_line($config->{'cmd_'.$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}.'_os_sec_update'});
+
     my($rc, $job);
     eval {
-        if($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'yum') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n yum upgrade -y --security', { message => 'Installing OS Updates' });
-        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'dnf') {
-            ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n dnf upgrade -y --security', { message => 'Installing OS Updates' });
-        } elsif($facts->{'ansible_facts'}->{'ansible_pkg_mgr'} eq 'apt') {
-            # debian has no simple way of installing sec updates only
-            ($rc, $job) = _remote_cmd($c, $peer, 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get upgrade -y', { message => 'Installing OS Updates'});
-        } else {
-            die("unknown package manager: ".$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}//'none');
-        }
-
+        ($rc, $job) = _remote_cmd($c, $peer, $cmd, { message => 'Installing OS security Updates' });
         die("starting job failed") unless $job;
     };
     if($@) {
@@ -617,12 +605,14 @@ sub omd_cleanup {
     my $facts = _ansible_get_facts($c, $peer, 0);
     return if $facts->{'cleaning'};
 
-    my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
-    my $f = Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+    my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+    my $config = config($c);
+    my $cmd    = _cmd_line($config->{'cmd_omd_cleanup'});
 
     my($rc, $job);
     eval {
-        ($rc, $job) = _remote_cmd($c, $peer, 'sudo -n omd cleanup', { message => 'Running OMD cleanup' });
+        ($rc, $job) = _remote_cmd($c, $peer, $cmd, { message => 'Running OMD cleanup' });
     };
     if($@) {
         $f = Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
@@ -719,8 +709,24 @@ sub config {
     if(-e $file) {
         $var = Thruk::Utils::IO::json_lock_retrieve($file);
     }
+
+    # set defaults
+    my $defaults = {
+        'cmd_omd_cleanup'         => 'sudo -n omd cleanup',
+        'cmd_yum_pkg_install'     => 'sudo -n yum install -y %PKG',
+        'cmd_dnf_pkg_install'     => 'sudo -n dnf install -y %PKG',
+        'cmd_apt_pkg_install'     => 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get install -y %PKG',
+        'cmd_yum_os_update'       => 'sudo -n yum upgrade -y',
+        'cmd_dnf_os_update'       => 'sudo -n dnf upgrade -y',
+        'cmd_apt_os_update'       => 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get upgrade -y',
+        'cmd_yum_os_sec_update'   => 'sudo -n yum upgrade -y --security',
+        'cmd_dnf_os_sec_update'   => 'sudo -n dnf upgrade -y --security',
+        'cmd_apt_os_sec_update'   => 'DEBIAN_FRONTEND=noninteractive sudo -En apt-get upgrade -y    ',
+    };
+
     # merge var into config
-    my $conf = {%{$c->config->{'Thruk::Plugin::NodeControl'}//{}}, %{$var//{}}};
+    my $conf = {%{$defaults}, %{$c->config->{'Thruk::Plugin::NodeControl'}//{}}, %{$var//{}}};
+
     return($conf);
 }
 
@@ -773,6 +779,20 @@ sub _parse_yum_check_update {
     my @pkgs = $out =~ /^(\S+)\s+\S+\s+\w+$/gmx;
     @pkgs = map { my $p = $_; $p =~ s/(\.noarch|\.x86_64)$//gmx; $p; } @pkgs;
     return(\@pkgs);
+}
+
+##########################################################
+
+sub _cmd_line {
+    my($rawcmd, $macros) = @_;
+    my $cmd = $rawcmd;
+    if($macros) {
+        for my $key (keys %{$macros}) {
+            my $val = $macros->{$key};
+            $cmd =~ s/$key/$val/gmx;
+        }
+    }
+    return $cmd;
 }
 
 ##########################################################
