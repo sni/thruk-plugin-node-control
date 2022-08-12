@@ -2,6 +2,8 @@
 
 This plugin allows you to control nodes (OMD / OS) from within Thruk.
 
+![Thruk Node Control Plugin](preview.png "Thruk Node Control Plugin")
+
 ## Features
 
   - OMD installation
