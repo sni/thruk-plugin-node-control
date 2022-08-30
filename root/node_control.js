@@ -4,7 +4,7 @@ var ms_refresh_timer;
 jQuery(document).ready(function() {
     window.clearTimeout(ms_refresh_timer);
     ms_refresh_timer = window.setTimeout(function() {
-        refresh_all_changed_rows();
+        refresh_all_changed_rows(null, 'TD.js-node-row');
     }, ms_row_refresh_interval)
 });
 
@@ -36,7 +36,7 @@ function nc_run_all(mainBtn, cls, extraData) {
             setBtnNoSpinner(btn);
             startNext();
 
-            refresh_all_changed_rows_now(extraData);
+            refresh_all_changed_rows_now(null, 'TD.js-node-row');
         }, extraData);
     }
     var parallel = jQuery("INPUT[name='parallel']").val();
@@ -45,10 +45,10 @@ function nc_run_all(mainBtn, cls, extraData) {
     }
 }
 
-function refresh_all_changed_rows_now(extraData) {
+function refresh_all_changed_rows_now(extraData, selector) {
     window.clearTimeout(ms_refresh_timer);
     ms_refresh_timer = window.setTimeout(function() {
-        refresh_all_changed_rows(extraData);
+        refresh_all_changed_rows(extraData, selector);
     }, 200)
 }
 
@@ -80,7 +80,7 @@ function refresh_all_changed_rows(extraData, selector) {
             rows = jQuery("DIV.spinner").parents("TR");
             if(rows.length > 0) {
                 ms_refresh_timer = window.setTimeout(function() {
-                    ms_refresh_timer = refresh_all_changed_rows(extraData);
+                    ms_refresh_timer = refresh_all_changed_rows(extraData, selector);
                 }, ms_row_refresh_interval)
             }
         }
