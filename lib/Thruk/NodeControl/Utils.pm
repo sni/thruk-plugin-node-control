@@ -3,6 +3,7 @@ package Thruk::NodeControl::Utils;
 use warnings;
 use strict;
 use Cpanel::JSON::XS ();
+use Time::HiRes qw/sleep/;
 
 use Thruk::Base ();
 use Thruk::Constants qw/:peer_states/;
@@ -49,7 +50,7 @@ return list of available peers
 sub get_peers {
     my($c) = @_;
     my @peers;
-    for my $peer (@{$c->db->get_local_peers()}, @{$c->db->get_http_peers()}) {
+    for my $peer (@{$c->db->get_local_peers()}, @{$c->db->get_http_peers(1)}) {
         next if (defined $peer->{'disabled'} && $peer->{'disabled'} == HIDDEN_LMD_PARENT);
         push @peers, $peer;
     }
@@ -77,10 +78,26 @@ sub get_server {
         $save_required = 1;
         $facts->{'gathering'} = 0;
     }
-    for my $key (qw/cleaning installing updating os_updating os_sec_updating/) {
+
+    my $job_checking = 0;
+    for my $key (qw/run_all cleaning installing updating os_updating os_sec_updating/) {
         my $job = $facts->{$key};
         next unless $job;
-        next if $job eq "1"; # starting right now
+        # starting right now
+        if($job eq "1") {
+            $job_checking = 1;
+            if($facts->{'job_checking'}) {
+                if($facts->{'job_checking'} < time() - 10) {
+                    delete $facts->{'job_checking'};
+                    $facts->{$key} = 0;
+                    $save_required = 1;
+                }
+            } else {
+                $facts->{'job_checking'} = time();
+                $save_required = 1;
+            }
+            return;
+        }
         my $data;
         eval {
             $data = $peer->job_data($c, $job);
@@ -98,6 +115,14 @@ sub get_server {
             $save_required = 1;
             $refresh_required = 1;
         }
+        if(!$data) {
+            $facts->{$key} = 0;
+            $save_required = 1;
+        }
+    }
+    if($facts->{'job_checking'} && !$job_checking) {
+        delete $facts->{'job_checking'};
+        $save_required = 1;
     }
     if($save_required) {
         Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
@@ -118,6 +143,7 @@ sub get_server {
         section                 => $peer->{'section'},
         gathering               => $facts->{'gathering'} || 0,
         cleaning                => $facts->{'cleaning'} || 0,
+        run_all                 => $facts->{'run_all'} || 0,
         installing              => $facts->{'installing'} || 0,
         updating                => $facts->{'updating'} || 0,
         os_updating             => $facts->{'os_updating'} || 0,
@@ -193,7 +219,7 @@ sub update_runtime_data {
     my($c, $peer, $skip_cpu) = @_;
 
     my $f = ansible_get_facts($c, $peer, 0);
-    return($f) unless defined $f->{'ansible_facts'}; # update only if we at least fetched facts once
+    return($f) unless defined $f->{'ansible_facts'}; # update only if we have at least fetched facts once
 
     Thruk::Utils::IO::mkdir_r($c->config->{'var_path'}.'/node_control');
     my $file = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
@@ -381,13 +407,13 @@ sub _ansible_available_os_updates {
 
 =head2 omd_install
 
-  omd_install($c, $peer, $version)
+  omd_install($c, $peer, $version, $force)
 
 installs given version on peer
 
 =cut
 sub omd_install {
-    my($c, $peer, $version) = @_;
+    my($c, $peer, $version, $force) = @_;
 
     my $facts = _ansible_get_facts($c, $peer, 0);
     if(!$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}) {
@@ -397,6 +423,7 @@ sub omd_install {
     $version = "omd-".$version;
 
     return if $facts->{'installing'};
+    return if($facts->{'run_all'} && !$force);
 
     my $config = config($c);
     if(!$config->{'cmd_'.$facts->{'ansible_facts'}->{'ansible_pkg_mgr'}.'_pkg_install'}) {
@@ -431,10 +458,11 @@ update site to given version on peer
 
 =cut
 sub omd_update {
-    my($c, $peer, $version) = @_;
+    my($c, $peer, $version, $force) = @_;
 
     my $facts = _ansible_get_facts($c, $peer, 0);
     return if $facts->{'updating'};
+    return if ($facts->{'run_all'} && !$force);
 
     my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'updating' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
@@ -479,17 +507,7 @@ sub _omd_update_step2 {
     Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
 
     # wait for 60 sec
-    my $end = time() + 60;
-    my $jobdata;
-    while(time() < $end) {
-        eval {
-            $jobdata = $peer->job_data($c, $job);
-        };
-        if($jobdata && !$jobdata->{'is_running'}) {
-            last;
-        }
-        sleep(3);
-    }
+    my $jobdata = _wait_for_job($c, $peer, $job, 3, 60);
 
     if($jobdata && !$jobdata->{'is_running'}) {
         if($config->{'hook_update_post'}) {
@@ -504,6 +522,90 @@ sub _omd_update_step2 {
     update_runtime_data($c, $peer, 1);
 
     return($job);
+}
+
+##########################################################
+
+=head2 omd_install_update_cleanup
+
+  omd_install_update_cleanup($c, $peer, $version)
+
+install and update site to given version on peer, then run cleanup
+
+=cut
+sub omd_install_update_cleanup {
+    my($c, $peer, $version) = @_;
+
+    my $facts = _ansible_get_facts($c, $peer, 0);
+    return if $facts->{'installing'};
+    return if $facts->{'updating'};
+    return if $facts->{'cleaning'};
+    return if $facts->{'run_all'};
+
+    my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $config = config($c);
+
+    # continue in background job
+    my $job = Thruk::Utils::External::perl($c, {
+        expr       => 'Thruk::NodeControl::Utils::_omd_install_update_cleanup_step2($c, "'.$peer->{'key'}.'", "'.$version.'")',
+        background => 1,
+    });
+    Thruk::Utils::IO::json_lock_patch($file, { 'run_all' => $job, 'last_job' => $job }, { pretty => 1, allow_empty => 1 });
+    return($job);
+}
+
+##########################################################
+sub _omd_install_update_cleanup_step2 {
+    my($c, $peerkey, $version) = @_;
+    my $peer   = $c->db->get_peer_by_key($peerkey);
+    my $config = config($c);
+    my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
+    my $facts  = _ansible_get_facts($c, $peer, 0);
+
+    my($job, $jobdata);
+    # install omd pkg
+    print "*** installing $version\n";
+    if(!grep(/$version/mx, @{$facts->{'omd_versions'} // []})) {
+        $job     = omd_install($c, $peer, $version, 1);
+        die("failed to start install") unless $job;
+        $jobdata = _wait_for_job($c, $peer, $job, 3, 1800);
+        return unless $jobdata;
+        print $jobdata->{'stdout'},"\n";
+        print $jobdata->{'stderr'},"\n";
+    } else {
+        print "*** not required, already installed\n";
+    }
+
+    # update
+    my $f = _ansible_get_facts($c, $peer, 0);
+    print "*** updating to $version\n";
+    if($f->{'omd_version'} ne $version) {
+        $job  = omd_update($c, $peer, $version, 1);
+        my $f = _ansible_get_facts($c, $peer, 0);
+        if(!$job && $f->{'last_error'}) {
+            print $f->{'last_error'};
+            return;
+        }
+        die("failed to start update") unless $job;
+        $jobdata = _wait_for_job($c, $peer, $job, 3, 180);
+        return unless $jobdata;
+        print $jobdata->{'stdout'},"\n";
+        print $jobdata->{'stderr'},"\n";
+    } else {
+        print "*** not required, already current version\n";
+    }
+
+    # cleanup
+    print "*** running cleanup\n";
+    $job     = omd_cleanup($c, $peer, 1);
+    die("failed to start cleanup") unless $job;
+    $jobdata = _wait_for_job($c, $peer, $job, 3, 1800);
+    print $jobdata->{'stdout'},"\n";
+    print $jobdata->{'stderr'},"\n";
+
+    Thruk::Utils::IO::json_lock_patch($file, { 'run_all' => 0, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
+
+    return(1);
 }
 
 ##########################################################
@@ -600,10 +702,11 @@ runs omd cleanup on peer
 
 =cut
 sub omd_cleanup {
-    my($c, $peer) = @_;
+    my($c, $peer, $force) = @_;
 
     my $facts = _ansible_get_facts($c, $peer, 0);
     return if $facts->{'cleaning'};
+    return if($facts->{'run_all'} && !$force);
 
     my $file   = $c->config->{'var_path'}.'/node_control/'.$peer->{'key'}.'.json';
     my $f      = Thruk::Utils::IO::json_lock_patch($file, { 'cleaning' => 1, 'last_error' => '' }, { pretty => 1, allow_empty => 1 });
@@ -683,6 +786,19 @@ start/stop omd services
 =cut
 sub omd_service {
     my($c, $peer, $service, $cmd) = @_;
+    my $job = Thruk::Utils::External::perl($c, {
+        'expr'       => 'Thruk::NodeControl::Utils::_omd_service_cmd($c, "'.$peer->{'key'}.'", "'.$service.'", "'.$cmd.'");',
+        'background' => 1,
+        'clean'      => 1,
+    });
+    _wait_for_job($c, $peer, $job, 0.2, 90);
+    return;
+}
+
+##########################################################
+sub _omd_service_cmd {
+    my($c, $peerkey, $service, $cmd) = @_;
+    my $peer = $c->db->get_peer_by_key($peerkey);
     my($rc, $out);
     eval {
         ($rc, $out) = _remote_cmd($c, $peer, 'omd '.$cmd.' '.$service);
@@ -690,6 +806,7 @@ sub omd_service {
     if($@) {
         _warn("omd cmd failed: %s", $out);
     }
+    update_runtime_data($c, $peer, 1);
     return;
 }
 
@@ -793,6 +910,25 @@ sub _cmd_line {
         }
     }
     return $cmd;
+}
+
+##########################################################
+sub _wait_for_job {
+    my($c, $peer, $job, $poll_interval, $max_wait) = @_;
+    $max_wait      = 60 unless $max_wait;
+    $poll_interval =  3 unless $poll_interval;
+    my $end = time() + $max_wait;
+    my $jobdata;
+    while(time() < $end) {
+        eval {
+            $jobdata = $peer->job_data($c, $job);
+        };
+        if($jobdata && !$jobdata->{'is_running'}) {
+            last;
+        }
+        sleep($poll_interval);
+    }
+    return($jobdata);
 }
 
 ##########################################################

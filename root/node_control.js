@@ -36,7 +36,7 @@ function nc_run_all(mainBtn, cls, extraData) {
             setBtnNoSpinner(btn);
             startNext();
 
-            refresh_all_changed_rows_now();
+            refresh_all_changed_rows_now(extraData);
         }, extraData);
     }
     var parallel = jQuery("INPUT[name='parallel']").val();
@@ -45,35 +45,44 @@ function nc_run_all(mainBtn, cls, extraData) {
     }
 }
 
-function refresh_all_changed_rows_now() {
+function refresh_all_changed_rows_now(extraData) {
     window.clearTimeout(ms_refresh_timer);
     ms_refresh_timer = window.setTimeout(function() {
-        refresh_all_changed_rows();
+        refresh_all_changed_rows(extraData);
     }, 200)
 }
 
-function refresh_all_changed_rows() {
+function refresh_all_changed_rows(extraData) {
     window.clearTimeout(ms_refresh_timer);
-    ms_refresh_timer = null;
     var rows = jQuery("DIV.spinner").parents("TR");
     if(rows.length == 0) {
-        ms_refresh_timer = window.setTimeout(function() {
-            refresh_all_changed_rows();
-        }, ms_row_refresh_interval)
         return;
     }
-    jQuery.get('node_control.cgi', {}, function(data, textStatus, jqXHR) {
-        var table = jQuery(rows[0]).parents('TABLE')[0];
-        jQuery(rows).each(function(i, el) {
-            if(el.id) {
-                var newRow = jQuery(data).find('#'+el.id);
-                jQuery('#'+el.id).replaceWith(newRow);
+    jQuery.ajax({
+        url:     'node_control.cgi',
+        data:     extraData,
+        complete: function(data, textStatus, jqXHR) {
+            if(data && data.responseText) {
+                var table = jQuery(rows[0]).parents('TABLE')[0];
+                jQuery(rows).each(function(i, el) {
+                    if(el.id && data.responseText.match(el.id)) {
+                        var newRow = jQuery(data.responseText).find('#'+el.id);
+                        if(newRow.length > 0) { // removes omd service status rows otherwise
+                            jQuery('#'+el.id).replaceWith(newRow);
+                        } else {
+                            console.log("found no new row in result for id: "+el.id);
+                        }
+                    }
+                });
+                applyRowStripes(table);
             }
-        });
-        applyRowStripes(table);
-        ms_refresh_timer = window.setTimeout(function() {
-            ms_refresh_timer = refresh_all_changed_rows();
-        }, ms_row_refresh_interval)
+            rows = jQuery("DIV.spinner").parents("TR");
+            if(rows.length > 0) {
+                ms_refresh_timer = window.setTimeout(function() {
+                    ms_refresh_timer = refresh_all_changed_rows(extraData);
+                }, ms_row_refresh_interval)
+            }
+        }
     });
 }
 
@@ -82,10 +91,11 @@ function nc_omd_service(btn, extraData) {
     setBtnSpinner(btn, true);
 
     var form = jQuery(btn).parents('FORM');
-    submitFormInBackground(form, function() {
-        setBtnNoSpinner(btn);
+    submitFormInBackground(form, function(form, success, data, textStatus, jqXHR) {
+        // update service row
+        refresh_all_changed_rows({action: 'omd_status', modal: 1, peer: extraData['peer']});
 
-        // update table row
-        refresh_all_changed_rows_now();
+        // update node row
+        //refresh_all_changed_rows();
     }, extraData);
 }

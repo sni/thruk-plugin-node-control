@@ -46,11 +46,11 @@ sub index {
 
     if($action && $action ne 'list') {
         eval {
-            return _node_action($c, $action);
+            return(_node_action($c, $action));
         };
         if($@) {
             _warn("action %s failed: %s", $action, $@);
-            return({ json => {'success' => 0, 'error' => $@} });
+            return($c->render(json => {'success' => 0, 'error' => $@}))
         }
     }
     if($action eq 'save_options') {
@@ -98,17 +98,17 @@ sub _node_action {
     my $config = Thruk::NodeControl::Utils::config($c);
     my $key    = $c->req->parameters->{'peer'};
     if(!$key) {
-        return({ json => {'success' => 0, "error" => "no peer key supplied" } });
+        return($c->render(json => {'success' => 0, "error" => "no peer key supplied"}));
     }
     my $peer = $c->db->get_peer_by_key($key);
     if(!$peer) {
-        return({ json => {'success' => 0, "error" => "no such peer found by key" } });
+        return($c->render(json => {'success' => 0, "error" => "no such peer found by key"}));
     }
 
     if($action eq 'update') {
         return unless Thruk::Utils::check_csrf($c);
         my $facts = Thruk::NodeControl::Utils::ansible_get_facts($c, $peer, 1);
-        return({ json => {'success' => 1} });
+        return($c->render(json => {'success' => 1}));
     }
 
     if($action eq 'facts') {
@@ -127,67 +127,70 @@ sub _node_action {
     }
 
     if($action eq 'omd_stop') {
-        return unless Thruk::Utils::check_csrf($c);
-        my $service = $c->req->parameters->{'service'};
-        Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "stop");
-        Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
-        return({ json => {'success' => 1} });
+        return(_omd_service_cmd($c, $peer, "stop"));
     }
 
     if($action eq 'omd_start') {
-        return unless Thruk::Utils::check_csrf($c);
-        my $service = $c->req->parameters->{'service'};
-        Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "start");
-        Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
-        return({ json => {'success' => 1} });
+        return(_omd_service_cmd($c, $peer, "start"));
     }
 
     if($action eq 'omd_restart') {
-        return unless Thruk::Utils::check_csrf($c);
-        my $service = $c->req->parameters->{'service'};
-        Thruk::NodeControl::Utils::omd_service($c, $peer, $service, "restart");
-        Thruk::NodeControl::Utils::update_runtime_data($c, $peer, 1);
-        return({ json => {'success' => 1} });
+        return(_omd_service_cmd($c, $peer, "restart"));
     }
 
     if($action eq 'cleanup') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::omd_cleanup($c, $peer);
-        return({ json => {'success' => 1} }) if $job;
-        return({ json => {'success' => 0, 'error' => "failed to start job" } });
+        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'omd_install') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::omd_install($c, $peer, $config->{'omd_default_version'});
-        return({ json => {'success' => 1} }) if $job;
-        return({ json => {'success' => 0, 'error' => "failed to start job" } });
+        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'omd_update') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::omd_update($c, $peer, $config->{'omd_default_version'});
-        return({ json => {'success' => 1} }) if $job;
-        return({ json => {'success' => 0, 'error' => "failed to start job" } });
+        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
+    }
+
+    if($action eq 'omd_install_update_cleanup') {
+        return unless Thruk::Utils::check_csrf($c);
+        my $job = Thruk::NodeControl::Utils::omd_install_update_cleanup($c, $peer, $config->{'omd_default_version'});
+        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'os_update') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::os_update($c, $peer, $config->{'omd_default_version'});
-        return({ json => {'success' => 1} }) if $job;
-        return({ json => {'success' => 0, 'error' => "failed to start job" } });
+        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'os_sec_update') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::os_sec_update($c, $peer, $config->{'omd_default_version'});
-        return({ json => {'success' => 1} }) if $job;
-        return({ json => {'success' => 0, 'error' => "failed to start job" } });
+        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 0, 'error' => "failed to start job" }));
     }
 
     return;
 }
 
+##########################################################
+sub _omd_service_cmd {
+    my($c, $peer, $cmd) = @_;
+    return unless Thruk::Utils::check_csrf($c);
+    my $service = $c->req->parameters->{'service'};
+    Thruk::NodeControl::Utils::omd_service($c, $peer, $service, $cmd);
+    return($c->render(json => {'success' => 1}));
+}
 ##########################################################
 
 1;
