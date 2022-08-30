@@ -89,7 +89,7 @@
       <tbody class="rowhover">
         [% FOREACH s = data %]
           <tr class="js-tabs" id="node_row_[% s.peer_key | html %]">
-            <td class="align-top">[% IF s.section != "Default"; s.section | html; END %]</td>
+            <td class="align-top js-node-row">[% IF s.section != "Default"; s.section | html; END %]</td>
             <td class="align-top"><a class="link" target="_blank" href="//[% s.host_name | html %]/[% s.omd_site | html %]/"><i class="uil uil-external-link-alt text-xs"></i>[% s.host_name | html %]</a></td>
             <td class="align-top">
               [% IF s.omd_site %]

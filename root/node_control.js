@@ -52,9 +52,10 @@ function refresh_all_changed_rows_now(extraData) {
     }, 200)
 }
 
-function refresh_all_changed_rows(extraData) {
+function refresh_all_changed_rows(extraData, selector) {
     window.clearTimeout(ms_refresh_timer);
-    var rows = jQuery("DIV.spinner").parents("TR");
+    if(!selector) { selector = "DIV.spinner"; }
+    var rows = jQuery(selector).parents("TR");
     if(rows.length == 0) {
         return;
     }
@@ -93,9 +94,9 @@ function nc_omd_service(btn, extraData) {
     var form = jQuery(btn).parents('FORM');
     submitFormInBackground(form, function(form, success, data, textStatus, jqXHR) {
         // update service row
-        refresh_all_changed_rows({action: 'omd_status', modal: 1, peer: extraData['peer']});
+        refresh_all_changed_rows({action: 'omd_status', modal: 1, peer: extraData['peer']}, 'TD.js-omd-status-'+extraData["peer"]+'-'+extraData["service"]);
 
         // update node row
-        //refresh_all_changed_rows();
+        refresh_all_changed_rows(null, 'TD.js-node-row');
     }, extraData);
 }
