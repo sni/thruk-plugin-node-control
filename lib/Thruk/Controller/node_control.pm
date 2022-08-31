@@ -50,7 +50,7 @@ sub index {
         };
         if($@) {
             _warn("action %s failed: %s", $action, $@);
-            return($c->render(json => {'success' => 0, 'error' => $@}))
+            return($c->render(json => {'success' => 0, 'error' => $@}));
         }
     }
     if($action eq 'save_options') {

@@ -2,6 +2,7 @@ package Thruk::NodeControl::Utils;
 
 use warnings;
 use strict;
+use Carp;
 use Cpanel::JSON::XS ();
 use Time::HiRes qw/sleep/;
 
