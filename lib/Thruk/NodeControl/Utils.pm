@@ -740,7 +740,7 @@ sub _remote_cmd {
         my $facts     = ansible_get_facts($c, $peer, 0);
         my $host_name = $facts->{'ansible_facts'}->{'ansible_fqdn'};
         if($host_name && !$background_options) {
-            _debug("remote cmd failed: %s", $err);
+            _warn("remote cmd failed, trying ssh fallback: %s", $err);
             _debug("fallback to ssh");
             ($rc, $out) = Thruk::Utils::IO::cmd($c, "ansible all -i $host_name, -m shell -a \"".$cmd."\"");
             die($out) if $out =~ m/^.*?\s+\|\s+UNREACHABLE.*?=>/mx;
@@ -805,7 +805,7 @@ sub _omd_service_cmd {
         ($rc, $out) = _remote_cmd($c, $peer, 'omd '.$cmd.' '.$service);
     };
     if($@) {
-        _warn("omd cmd failed: %s", $out);
+        _warn("omd cmd failed: %s", $@);
     }
     update_runtime_data($c, $peer, 1);
     return;
