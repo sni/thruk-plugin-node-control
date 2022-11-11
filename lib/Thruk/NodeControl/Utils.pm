@@ -758,10 +758,10 @@ sub _ansible_adhoc_cmd {
     my($c, $peer, $args) = @_;
     my($rc, $data) = _remote_cmd($c, $peer, 'ansible all -i localhost, -c local '.$args);
     if($rc != 0) {
-        die("ansible failed: $rc ".$data);
+        die("ansible failed: rc $rc ".$data);
     }
     if($data !~ m/\Qlocalhost | SUCCESS =>\E/gmx) {
-        die("ansible failed: $rc ".$data);
+        die("ansible failed: rc $rc ".$data);
     }
     $data =~ s/\A.*?\Qlocalhost | SUCCESS =>\E//sgmx;
     my $jsonreader = Cpanel::JSON::XS->new->utf8;
