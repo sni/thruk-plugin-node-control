@@ -37,6 +37,7 @@ sub index {
     $c->stash->{template}              = 'node_control.tt';
     $c->stash->{infoBoxTitle}          = 'Node Control';
     $c->stash->{plugin_name}           = Thruk::Utils::get_plugin_name(__FILE__, __PACKAGE__);
+    $c->stash->{'has_jquery_ui'}       = 1;
 
     my $config               = Thruk::NodeControl::Utils::config($c);
     my $parallel_actions     = $config->{'parallel_tasks'} // 3;
@@ -141,42 +142,42 @@ sub _node_action {
     if($action eq 'cleanup') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::omd_cleanup($c, $peer);
-        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 1, job => $job})) if $job;
         return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'omd_install') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::omd_install($c, $peer, $config->{'omd_default_version'});
-        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 1, job => $job})) if $job;
         return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'omd_update') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::omd_update($c, $peer, $config->{'omd_default_version'});
-        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 1, job => $job})) if $job;
         return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'omd_install_update_cleanup') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::omd_install_update_cleanup($c, $peer, $config->{'omd_default_version'});
-        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 1, job => $job})) if $job;
         return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'os_update') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::os_update($c, $peer, $config->{'omd_default_version'});
-        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 1, job => $job})) if $job;
         return($c->render(json => {'success' => 0, 'error' => "failed to start job"}));
     }
 
     if($action eq 'os_sec_update') {
         return unless Thruk::Utils::check_csrf($c);
         my $job = Thruk::NodeControl::Utils::os_sec_update($c, $peer, $config->{'omd_default_version'});
-        return($c->render(json => {'success' => 1})) if $job;
+        return($c->render(json => {'success' => 1, job => $job})) if $job;
         return($c->render(json => {'success' => 0, 'error' => "failed to start job" }));
     }
 

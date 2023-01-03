@@ -132,14 +132,14 @@
                     [% IF s.os_updating %]
                       <div class="spinner clickable" onclick="showJobOutputPopup('[% s.os_updating | html %]','[% s.peer_key | html %]'); return false;"></div>
                     [% ELSE %]
-                      <button class="round p-0 h-5 w-5 gray text-xs text-center [% IF s.os_updates.size == 0 || s.os_sec_updating %]invisible[% END %] js-os-update-btn" title="There are [% s.os_updates.size %] updates available: [% s.os_updates.join(", ").substr(0, 250) %]" onclick="return send_form_in_background_and_reload(this, {action: 'os_update'}, true)">
+                      <button class="round p-0 h-5 w-5 gray text-xs text-center [% IF s.os_updates.size == 0 || s.os_sec_updating %]invisible[% END %] js-os-update-btn" title="There are [% s.os_updates.size %] updates available: [% s.os_updates.join(", ").substr(0, 250) %]" onclick="return nc_action_with_popup(this, {action: 'os_update'}, '[% s.peer_key | html %]')">
                         <i style="font-style: normal;">[% s.os_updates.size %]</i>
                       </button>
                     [% END %]
                     [% IF s.os_sec_updating %]
                       <div class="spinner clickable" style="margin-left: 3px;" onclick="showJobOutputPopup('[% s.os_sec_updating | html %]','[% s.peer_key | html %]'); return false;"></div>
                     [% ELSE %]
-                      <button class="round p-0 h-5 w-5 red text-xs text-center [% IF s.os_security.size == 0 || s.os_updating %]invisible[% END %] js-os-sec-update-btn" title="There are [% s.os_security.size %] security updates available: [% s.os_security.join(", ").substr(0, 250) %]" onclick="return send_form_in_background_and_reload(this, {action: 'os_sec_update'}, true)">
+                      <button class="round p-0 h-5 w-5 red text-xs text-center [% IF s.os_security.size == 0 || s.os_updating %]invisible[% END %] js-os-sec-update-btn" title="There are [% s.os_security.size %] security updates available: [% s.os_security.join(", ").substr(0, 250) %]" onclick="return nc_action_with_popup(this, {action: 'os_sec_update'}, '[% s.peer_key | html %]')">
                         <i style="font-style: normal;">[% s.os_security.size %]</i>
                       </button>
                     [% END %]
@@ -198,26 +198,26 @@
                     [% IF !omd_default_available && s.omd_available_versions.size > 0 %]
                       <a href="#" class="js-install-btn disabled not-clickable" title="omd version [% omd_default_version | html %] not available on this host."><i class="fa-solid fa-truck-arrow-right text-sm"></i></a>
                     [% ELSE %]
-                      <a href="#" class="js-install-btn [% IF has_installed || !s.omd_version %]invisible[% ELSE; show_all_btn = 1; END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_install'}, true)"><i class="fa-solid fa-truck-arrow-right text-sm" title="Install omd-[% omd_default_version | html %]"></i></a>
+                      <a href="#" class="js-install-btn [% IF has_installed || !s.omd_version %]invisible[% ELSE; show_all_btn = 1; END %]" onclick="return nc_action_with_popup(this, {action: 'omd_install'}, '[% s.peer_key | html %]')"><i class="fa-solid fa-truck-arrow-right text-sm" title="Install omd-[% omd_default_version | html %]"></i></a>
                     [% END %]
                   [% END %]
 
                   [% IF s.updating %]
                     <div class="spinner clickable" style="margin-right: 3px;" title="site is updating omd right now" onclick="showJobOutputPopup('[% s.updating | html %]','[% s.peer_key | html %]')"></div>
                   [% ELSE %]
-                    <a href="#" class="js-omd-update-btn [% IF s.omd_version == omd_default_version || !has_installed %]invisible[% ELSE; show_all_btn = 1; END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_update'}, true)"><i class="fa-solid fa-square-up-right text-sm" title="Update to omd-[% omd_default_version | html %]"></i></a>
+                    <a href="#" class="js-omd-update-btn [% IF s.omd_version == omd_default_version || !has_installed %]invisible[% ELSE; show_all_btn = 1; END %]" onclick="return nc_action_with_popup(this, {action: 'omd_update'}, '[% s.peer_key | html %]')"><i class="fa-solid fa-square-up-right text-sm" title="Update to omd-[% omd_default_version | html %]"></i></a>
                   [% END %]
 
                   [% IF s.cleaning %]
                     <div class="spinner clickable" style="margin-right: 3px;" title="site is cleaning up right now" onclick="showJobOutputPopup('[% s.cleaning | html %]','[% s.peer_key | html %]')"></div>
                   [% ELSE %]
-                    <a href="#" class="js-cleanup-btn [% IF s.omd_cleanable.size == 0 %]invisible[% ELSE; show_all_btn = 1; END %]" onclick="return send_form_in_background_and_reload(this, {action: 'cleanup'}, true)"><i class="fa-solid fa-broom text-sm" title="Run omd cleanup to remove:&#013;[% s.omd_cleanable.join("&#013;") %]"></i></a>
+                    <a href="#" class="js-cleanup-btn [% IF s.omd_cleanable.size == 0 %]invisible[% ELSE; show_all_btn = 1; END %]" onclick="return nc_action_with_popup(this, {action: 'cleanup'}, '[% s.peer_key | html %]')"><i class="fa-solid fa-broom text-sm" title="Run omd cleanup to remove:&#013;[% s.omd_cleanable.join("&#013;") %]"></i></a>
                   [% END %]
 
                   [% IF s.run_all %]
                     <div class="spinner clickable" style="margin-right: 3px;" title="site is updating right now" onclick="showJobOutputPopup('[% s.run_all | html %]','[% s.peer_key | html %]')"></div>
                   [% ELSE %]
-                    <a href="#" class="js-run-all-btn [% IF !show_all_btn %]invisible[% END %]" onclick="return send_form_in_background_and_reload(this, {action: 'omd_install_update_cleanup'}, true)"><i class="fa-solid fa-arrows-up-to-line text-sm" title="Run omd install,update,cleanup"></i></a>
+                    <a href="#" class="js-run-all-btn [% IF !show_all_btn %]invisible[% END %]" onclick="return nc_action_with_popup(this, {action: 'omd_install_update_cleanup'}, '[% s.peer_key | html %]')"><i class="fa-solid fa-arrows-up-to-line text-sm" title="Run omd install,update,cleanup"></i></a>
                   [% END %]
 
                   [% IF s.last_job %]
@@ -244,5 +244,15 @@
     </div>
   </div>
 </div>
+
+[% IF c.req.parameters.defined("showjob") %]
+<script>
+  showJobOutputPopup('[% c.req.parameters.showjob %]', '[% c.req.parameters.showpeer %]');
+  removeParams["showjob"]  = true;
+  removeParams["showpeer"] = true;
+  updateUrl();
+</script>
+[% END %]
+
 
 [% PROCESS _footer.tt %]
