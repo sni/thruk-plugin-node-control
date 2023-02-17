@@ -228,10 +228,18 @@
             </td>
           </tr>
           [% IF s.last_error %]
+            [% lines = s.last_error.split("\n") %]
             <tr>
               <td></td>
               <td></td>
-              <td colspan="9" class="textALERT whitespace-pre truncate overflow-hidden clickable" style="max-width: 60vw;" onclick="toggleElement(jQuery(this).find('SPAN')[0])">[% lines = s.last_error.split("\n"); lines.shift | html %]<br><span class="hidden">[% lines.join("\n") %]</span></td>
+              <td colspan="9" class="textALERT whitespace-pre truncate overflow-hidden [% IF lines.size > 1 %]clickable[% END %]" style="max-width: 60vw;" [% IF lines.size > 1 %]onclick="toggleElement(jQuery(this).find('SPAN')[0])"[% END %]>[% lines.shift | html %]<br><span class="hidden">[% lines.join("\n") %]</span></td>
+            </tr>
+          [% ELSIF s.last_facts_error %]
+            [% lines = s.last_facts_error.split("\n") %]
+            <tr>
+              <td></td>
+              <td></td>
+              <td colspan="9" class="textALERT whitespace-pre truncate overflow-hidden [% IF lines.size > 1 %]clickable[% END %]" style="max-width: 60vw;" [% IF lines.size > 1 %]onclick="toggleElement(jQuery(this).find('SPAN')[0])"[% END %]>[% lines.shift | html %]<br><span class="hidden">[% lines.join("\n") %]</span></td>
             </tr>
           [% END %]
         [% END %]
@@ -245,7 +253,7 @@
   </div>
 </div>
 
-[% IF c.req.parameters.defined("showjob") %]
+[% IF c.req.parameters.defined("showjob") && c.req.parameters.showjob != "" %]
 <script>
   showJobOutputPopup('[% c.req.parameters.showjob %]', '[% c.req.parameters.showpeer %]');
   removeParams["showjob"]  = true;

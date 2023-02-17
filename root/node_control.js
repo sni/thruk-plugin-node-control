@@ -49,8 +49,10 @@ function nc_action_with_popup(btn, formData, peer_key) {
     var form = jQuery(btn).parents('FORM');
     setBtnSpinner(btn, true);
     submitFormInBackground(form, function(form, success, data, textStatus, jqXHR) {
-        additionalParams["showjob"]  = data.job;
-        additionalParams["showpeer"] = peer_key;
+        if(data.job) {
+            additionalParams["showjob"]  = data.job;
+            additionalParams["showpeer"] = peer_key;
+        }
         reloadPage();
     }, formData);
     return false;

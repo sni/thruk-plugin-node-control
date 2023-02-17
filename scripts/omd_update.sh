@@ -5,6 +5,13 @@ if [ "$OMD_UPDATE" = "" ]; then
     exit 1
 fi
 
+# try dry-run (available since OMD 5.10)
+DRYRUN=$(omd -V $OMD_UPDATE update -n 2>&1 | grep "conflicts during dry run" | awk '{ print $2 }')
+if [ -n "$DRYRUN" -a "$DRYRUN" != "0" ]; then
+    echo "no automatic update possible, $DRYRUN conflict(s) found."
+    exit 1
+fi
+
 echo "[$(date)] updating site $(id -un) from $(omd version -b) to version $OMD_UPDATE..."
 
 omd stop

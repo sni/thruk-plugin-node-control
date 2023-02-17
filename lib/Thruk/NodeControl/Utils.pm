@@ -138,7 +138,9 @@ sub get_server {
         $facts->{'gathering'} = 1;
     }
 
-    $facts->{'last_error'} =~ s/\s+at\s+.*HTTP\.pm\s+line\s+\d+\.//gmx if $facts->{'last_error'};
+    for my $errKey (qw/last_error last_facts_error/) {
+        $facts->{$errKey} =~ s/\s+at\s+.*HTTP\.pm\s+line\s+\d+\.//gmx if $facts->{$errKey};
+    }
     my $server = {
         peer_key                => $peer->{'key'},
         section                 => $peer->{'section'},
@@ -168,6 +170,7 @@ sub get_server {
         omd_disk_free           => $facts->{'omd_disk_free'} // '',
         omd_available_versions  => $facts->{'omd_packages_available'} // [],
         last_error              => $facts->{'last_error'} // '',
+        last_facts_error        => $facts->{'last_facts_error'} // '',
         last_job                => $facts->{'last_job'} // '',
         facts                   => $facts || {},
     };
@@ -202,7 +205,7 @@ sub ansible_get_facts {
         $f = _ansible_get_facts($c, $peer, $refresh);
     };
     if($@) {
-        $f = Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => 0, 'last_error' => $@ }, { pretty => 1, allow_empty => 1 });
+        $f = Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => 0, 'last_facts_error' => $@ }, { pretty => 1, allow_empty => 1 });
     }
     return($f);
 }
@@ -251,7 +254,7 @@ sub _ansible_get_facts {
 
     my $prev = Thruk::Utils::IO::json_lock_patch($file, { 'gathering' => $$ }, { pretty => 1, allow_empty => 1 });
     $prev->{'gathering'}  = 0;
-    $prev->{'last_error'} = "";
+    $prev->{'last_facts_error'} = "";
 
     # available subsets are listed here:
     # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/setup_module.html#parameter-gather_subset
@@ -288,6 +291,11 @@ sub _runtime_data {
     if($omd_disk =~ m/^.*\s+(\d+)\s+(\d+)\s+(\d+)\s+/gmx) {
         $runtime->{'omd_disk_total'} = $1;
         $runtime->{'omd_disk_free'}  = $3;
+    }
+
+    my(undef, $has_tmux) = _remote_cmd($c, $peer, 'command -v tmux');
+    if($has_tmux =~ m/tmux$/gmx) {
+        $runtime->{'has_tmux'} = $has_tmux;
     }
 
     if(!$skip_cpu) {
@@ -507,8 +515,12 @@ sub _omd_update_step2 {
 
     Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
 
-    # wait for 60 sec
-    my $jobdata = _wait_for_job($c, $peer, $job, 3, 60);
+    # wait for 120 sec
+    my $jobdata = _wait_for_job($c, $peer, $job, 3, 120, 1);
+    if($jobdata && $jobdata->{'rc'} != "0") {
+        update_runtime_data($c, $peer, 1);
+        return;
+    }
 
     if($jobdata && !$jobdata->{'is_running'}) {
         if($config->{'hook_update_post'}) {
@@ -583,8 +595,8 @@ sub _omd_install_update_cleanup_step2 {
     if($f->{'omd_version'} ne $version) {
         $job  = omd_update($c, $peer, $version, 1);
         my $f = _ansible_get_facts($c, $peer, 0);
-        if(!$job && $f->{'last_error'}) {
-            print $f->{'last_error'};
+        if(!$job && ($f->{'last_error'}//$f->{'last_facts_error'})) {
+            print ($f->{'last_error'}//$f->{'last_facts_error'});
             return;
         }
         die("failed to start update") unless $job;
@@ -915,7 +927,7 @@ sub _cmd_line {
 
 ##########################################################
 sub _wait_for_job {
-    my($c, $peer, $job, $poll_interval, $max_wait) = @_;
+    my($c, $peer, $job, $poll_interval, $max_wait, $print) = @_;
     $max_wait      = 60 unless $max_wait;
     $poll_interval =  3 unless $poll_interval;
     my $end = time() + $max_wait;
@@ -928,6 +940,10 @@ sub _wait_for_job {
             last;
         }
         sleep($poll_interval);
+    }
+    if($jobdata && $print) {
+        print $jobdata->{'stdout'},"\n" if $jobdata->{'stdout'};
+        print $jobdata->{'stderr'},"\n" if $jobdata->{'stderr'};
     }
     return($jobdata);
 }
