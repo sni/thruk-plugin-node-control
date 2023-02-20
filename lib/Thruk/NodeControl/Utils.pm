@@ -515,9 +515,9 @@ sub _omd_update_step2 {
 
     Thruk::Utils::IO::json_lock_patch($file, { 'updating' => $job, 'last_job' => $job, 'last_error' => "" }, { pretty => 1, allow_empty => 1 });
 
-    # wait for 120 sec
-    my $jobdata = _wait_for_job($c, $peer, $job, 3, 120, 1);
-    if($jobdata && $jobdata->{'rc'} != "0") {
+    # wait for 180 sec
+    my $jobdata = _wait_for_job($c, $peer, $job, 3, 180, 1);
+    if($jobdata && $jobdata->{'rc'} ne "0") {
         update_runtime_data($c, $peer, 1);
         return;
     }
