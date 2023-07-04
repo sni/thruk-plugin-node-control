@@ -5,7 +5,7 @@ if [ "$OMD_UPDATE" = "" ]; then
     exit 1
 fi
 
-# try dry-run (available since OMD 5.10)
+# try dry-run first (available since OMD 5.10)
 DRYRUN=$(omd -V $OMD_UPDATE update -n 2>&1 | grep "conflicts during dry run" | awk '{ print $2 }')
 if [ -n "$DRYRUN" -a "$DRYRUN" != "0" ]; then
     echo "no automatic update possible, $DRYRUN conflict(s) found."
@@ -60,9 +60,21 @@ fi
 if [ "$(omd version -b)" = "$OMD_UPDATE" ]; then
     omd start
     echo "[$(date)] update finished: $(omd version -b)"
+
+    # run post hook if available
+    RC=0
+    if [ -e "${OMD_ROOT}/var/tmp/omd_update_post.sh" ]; then
+        echo "[$(date)] starting post update hook"
+        bash -x ${OMD_ROOT}/var/tmp/omd_update_post.sh
+        RC=$?
+        rm -f ${OMD_ROOT}/var/tmp/omd_update_post.sh
+    fi
+
     # exit tmux again
-    tmux send-keys -t $session:$window "exit" C-m
-    exit 0
+    if command -v tmux >/dev/null 2>&1; then
+        tmux send-keys -t $session:$window "exit" C-m
+    fi
+    exit $RC
 fi
 
 echo "update failed, ssh into $HOSTNAME and run 'tmux attach -t $session:$window' to manually investigate"
