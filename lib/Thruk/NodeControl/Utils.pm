@@ -506,9 +506,10 @@ sub _omd_update_step2 {
         my $script = Thruk::Utils::IO::read($root."/../../../scripts/omd_update.sh");
         $peer->rpc($c, 'Thruk::Utils::IO::write', 'var/tmp/omd_update.sh', $script);
 
-        $peer->rpc($c, 'CORE::unlink', 'var/tmp/omd_update_post.sh');
         if($config->{'hook_update_post'}) {
             $peer->rpc($c, 'Thruk::Utils::IO::write', 'var/tmp/omd_update_post.sh', $config->{'hook_update_post'});
+        } else {
+            $peer->rpc($c, 'Thruk::Utils::IO::write', 'var/tmp/omd_update_post.sh', "");
         }
 
         ($rc, $job) = _remote_cmd($c, $peer, 'OMD_UPDATE="'.$version.'" bash var/tmp/omd_update.sh', { message => 'Updating Site To '.$version });

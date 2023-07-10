@@ -68,6 +68,7 @@ if [ "$(omd version -b)" = "$OMD_UPDATE" ]; then
         bash -x ${OMD_ROOT}/var/tmp/omd_update_post.sh
         RC=$?
         rm -f ${OMD_ROOT}/var/tmp/omd_update_post.sh
+        echo "[$(date)] post update hook exited: $RC"
     fi
 
     # exit tmux again
