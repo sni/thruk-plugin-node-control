@@ -293,7 +293,7 @@ sub _runtime_data {
         $runtime->{'omd_disk_free'}  = $3;
     }
 
-    my(undef, $has_tmux) = _remote_cmd($c, $peer, 'sh -c "command -v tmux"');
+    my(undef, $has_tmux) = _remote_cmd($c, $peer, '/bin/sh -c "command -v tmux"');
     if($has_tmux =~ m/tmux$/gmx) {
         $runtime->{'has_tmux'} = $has_tmux;
     }
